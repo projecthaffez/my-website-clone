@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { LikeButton } from "./LikeButton";
+import { SaveButton } from "./SaveButton";
 import { CommentForm } from "./CommentForm";
 import { DeleteCommentButton } from "./DeleteCommentButton";
 import { ReplyButton } from "./ReplyButton";
@@ -28,6 +29,7 @@ export async function PostCard({
   const [
     likeCount,
     currentUserReaction,
+    savedPost,
     comments,
   ] = await Promise.all([
     db.reaction.count({
@@ -51,20 +53,38 @@ export async function PostCard({
         })
       : null,
 
+    currentUser
+      ? db.savedPost.findUnique({
+          where: {
+            userId_postId: {
+              userId: currentUser.id,
+              postId: post.id,
+            },
+          },
+          select: {
+            userId: true,
+          },
+        })
+      : null,
+
     db.comment.findMany({
       where: {
         postId: post.id,
         isDeleted: false,
         parentId: null,
       },
+
       orderBy: {
         createdAt: "desc",
       },
+
       take: 5,
+
       select: {
         id: true,
         content: true,
         createdAt: true,
+
         author: {
           select: {
             id: true,
@@ -74,18 +94,23 @@ export async function PostCard({
             isVerified: true,
           },
         },
+
         replies: {
           where: {
             isDeleted: false,
           },
+
           orderBy: {
             createdAt: "asc",
           },
+
           take: 5,
+
           select: {
             id: true,
             content: true,
             createdAt: true,
+
             author: {
               select: {
                 id: true,
@@ -157,7 +182,9 @@ export async function PostCard({
             <span>
               @{post.author.username}
             </span>
+
             <span>•</span>
+
             <span>{formattedDate}</span>
           </div>
         </div>
@@ -168,13 +195,15 @@ export async function PostCard({
         {post.content}
       </div>
 
-      {/* Like */}
-      <div className="mt-5 border-t border-white/10 pt-3">
+      {/* Post Actions */}
+      <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
+        {/* Like */}
         {currentUser ? (
           <LikeButton
             postId={post.id}
             initialLiked={
-              currentUserReaction?.type === "LIKE"
+              currentUserReaction?.type ===
+              "LIKE"
             }
             initialCount={likeCount}
           />
@@ -187,6 +216,21 @@ export async function PostCard({
             {likeCount === 1
               ? "Like"
               : "Likes"}
+          </Link>
+        )}
+
+        {/* Save */}
+        {currentUser ? (
+          <SaveButton
+            postId={post.id}
+            initialSaved={Boolean(savedPost)}
+          />
+        ) : (
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
+          >
+            🔖 Save
           </Link>
         )}
       </div>
@@ -226,7 +270,8 @@ export async function PostCard({
                       {comment.author.avatarUrl ? (
                         <img
                           src={
-                            comment.author.avatarUrl
+                            comment.author
+                              .avatarUrl
                           }
                           alt={
                             comment.author.name
@@ -251,7 +296,8 @@ export async function PostCard({
                           {comment.author.name}
                         </Link>
 
-                        {comment.author.isVerified && (
+                        {comment.author
+                          .isVerified && (
                           <span className="text-xs text-blue-400">
                             ✓
                           </span>
@@ -286,9 +332,7 @@ export async function PostCard({
                         {currentUser?.id ===
                           comment.author.id && (
                           <DeleteCommentButton
-                            commentId={
-                              comment.id
-                            }
+                            commentId={comment.id}
                           />
                         )}
                       </div>
@@ -316,17 +360,14 @@ export async function PostCard({
 
                           return (
                             <div
-                              key={
-                                reply.id
-                              }
+                              key={reply.id}
                               className="flex gap-3"
                             >
                               <Link
                                 href={`/profile/${reply.author.username}`}
                                 className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-slate-800"
                               >
-                                {reply
-                                  .author
+                                {reply.author
                                   .avatarUrl ? (
                                   <img
                                     src={
@@ -343,8 +384,7 @@ export async function PostCard({
                                   />
                                 ) : (
                                   <div className="flex h-full w-full items-center justify-center text-xs font-bold text-slate-400">
-                                    {reply
-                                      .author
+                                    {reply.author
                                       .name
                                       .charAt(
                                         0,
@@ -367,8 +407,7 @@ export async function PostCard({
                                     }
                                   </Link>
 
-                                  {reply
-                                    .author
+                                  {reply.author
                                     .isVerified && (
                                     <span className="text-xs text-blue-400">
                                       ✓
@@ -392,14 +431,11 @@ export async function PostCard({
                                 </p>
 
                                 <p className="mt-1 text-xs text-slate-600">
-                                  {
-                                    replyDate
-                                  }
+                                  {replyDate}
                                 </p>
 
                                 {currentUser?.id ===
-                                  reply
-                                    .author
+                                  reply.author
                                     .id && (
                                   <DeleteCommentButton
                                     commentId={
