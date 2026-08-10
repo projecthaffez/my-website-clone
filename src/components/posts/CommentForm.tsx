@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createCommentAction } from "@/actions/comment";
 
 interface CommentFormProps {
@@ -10,6 +11,8 @@ interface CommentFormProps {
 export function CommentForm({
   postId,
 }: CommentFormProps) {
+  const router = useRouter();
+
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -53,9 +56,17 @@ export function CommentForm({
       setContent("");
       setSuccess(true);
 
-      window.location.reload();
+      /*
+       * Refresh the Server Component data
+       * without doing a full browser reload.
+       */
+      router.refresh();
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Comment submission failed:",
+        error,
+      );
+
       setError(
         "Failed to add comment. Please try again.",
       );
@@ -67,22 +78,30 @@ export function CommentForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="mt-4 space-y-2"
+      className="mt-4 space-y-3"
     >
       <textarea
         value={content}
-        onChange={(event) =>
-          setContent(event.target.value)
-        }
+        onChange={(event) => {
+          setContent(event.target.value);
+
+          if (error) {
+            setError("");
+          }
+
+          if (success) {
+            setSuccess(false);
+          }
+        }}
         placeholder="Write a comment..."
         rows={3}
         maxLength={2000}
         disabled={loading}
-        className="w-full resize-none rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-blue-500/50"
+        className="w-full resize-none rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-blue-500/50 disabled:cursor-not-allowed disabled:opacity-60"
       />
 
       <div className="flex items-center justify-between gap-3">
-        <div className="text-xs">
+        <div className="min-h-5 text-xs">
           {error && (
             <span className="text-red-400">
               {error}
@@ -96,17 +115,23 @@ export function CommentForm({
           )}
         </div>
 
-        <button
-          type="submit"
-          disabled={
-            loading || !content.trim()
-          }
-          className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading
-            ? "Commenting..."
-            : "Comment"}
-        </button>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="text-xs text-slate-600">
+            {content.length}/2000
+          </span>
+
+          <button
+            type="submit"
+            disabled={
+              loading || !content.trim()
+            }
+            className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading
+              ? "Commenting..."
+              : "Comment"}
+          </button>
+        </div>
       </div>
     </form>
   );
