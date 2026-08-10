@@ -113,7 +113,7 @@ write(
   `---\nname: clone-website\ndescription: "${shortDesc}"\ninvokable: true\n---\n${HEADER}${body}`
 );
 
-// 12. Amazon Q — JSON agent definition
+// 13. Amazon Q — JSON agent definition
 write(
   '.amazonq/cli-agents/clone-website.json',
   JSON.stringify(
@@ -128,4 +128,8 @@ write(
   ) + '\n'
 );
 
-console.log('\nDone! 13 platform command/skill files generated from source skill.');
+// 14. Antigravity — Agent Skill format
+write('.agents/skills/clone-website/SKILL.md', raw);
+
+console.log('\nDone! 14 platform command/skill files generated from source skill.');
+

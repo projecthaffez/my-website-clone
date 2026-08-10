@@ -1,0 +1,19 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="nexus-grad-1" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="50%" stop-color="#6D28D9"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
+    </linearGradient>
+    <linearGradient id="nexus-grad-accent" x1="0" y1="48" x2="48" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#06B6D4"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#nexus-grad-1)"/>
+  <!-- Interconnected N shape with node dots -->
+  <path d="M14 34V14L24 29L34 14V34" stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="14" cy="14" r="3" fill="url(#nexus-grad-accent)"/>
+  <circle cx="34" cy="34" r="3" fill="url(#nexus-grad-accent)"/>
+  <circle cx="24" cy="29" r="2.5" fill="white"/>
+</svg>
