@@ -64,6 +64,13 @@ export async function sendFriendRequestAction(
     });
 
     if (existingRequest) {
+      if (existingRequest.status === "BLOCKED") {
+        return {
+          success: false as const,
+          error: "You cannot send a friend request to this user.",
+        };
+      }
+
       if (existingRequest.status === "ACCEPTED") {
         return {
           success: false as const,
@@ -483,6 +490,190 @@ export async function removeFriendAction(
     return {
       success: false as const,
       error: "Failed to remove friend.",
+    };
+  }
+}
+
+export async function blockUserAction(
+  targetUserId: string,
+) {
+  try {
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      return {
+        success: false as const,
+        error: "You must be logged in.",
+      };
+    }
+
+    if (!targetUserId || targetUserId === currentUser.id) {
+      return {
+        success: false as const,
+        error: "Invalid user.",
+      };
+    }
+
+    const targetUser = await getTargetUser(targetUserId);
+
+    if (!targetUser || targetUser.isBanned) {
+      return {
+        success: false as const,
+        error: "User not found.",
+      };
+    }
+
+    const existingRelationship = await db.friendship.findFirst({
+      where: {
+        OR: [
+          {
+            requesterId: currentUser.id,
+            addresseeId: targetUser.id,
+          },
+          {
+            requesterId: targetUser.id,
+            addresseeId: currentUser.id,
+          },
+        ],
+      },
+    });
+
+    if (existingRelationship) {
+      if (
+        existingRelationship.status === "BLOCKED" &&
+        existingRelationship.requesterId === currentUser.id
+      ) {
+        return {
+          success: true as const,
+          message: "User is already blocked.",
+        };
+      }
+
+      await db.friendship.update({
+        where: {
+          id: existingRelationship.id,
+        },
+        data: {
+          requesterId: currentUser.id,
+          addresseeId: targetUser.id,
+          status: "BLOCKED",
+        },
+      });
+    } else {
+      await db.friendship.create({
+        data: {
+          requesterId: currentUser.id,
+          addresseeId: targetUser.id,
+          status: "BLOCKED",
+        },
+      });
+    }
+
+    await db.follow.deleteMany({
+      where: {
+        OR: [
+          {
+            followerId: currentUser.id,
+            followingId: targetUser.id,
+          },
+          {
+            followerId: targetUser.id,
+            followingId: currentUser.id,
+          },
+        ],
+      },
+    });
+
+    revalidatePath(`/profile/${targetUser.username}`);
+    revalidatePath(`/profile/${currentUser.username}`);
+    revalidatePath("/friends");
+    revalidatePath("/friends/requests");
+
+    return {
+      success: true as const,
+      message: "User blocked successfully.",
+    };
+  } catch (error) {
+    console.error(
+      "blockUserAction failed:",
+      error,
+    );
+
+    return {
+      success: false as const,
+      error: "Failed to block user. Please try again.",
+    };
+  }
+}
+
+export async function unblockUserAction(
+  targetUserId: string,
+) {
+  try {
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      return {
+        success: false as const,
+        error: "You must be logged in.",
+      };
+    }
+
+    if (!targetUserId || targetUserId === currentUser.id) {
+      return {
+        success: false as const,
+        error: "Invalid user.",
+      };
+    }
+
+    const targetUser = await getTargetUser(targetUserId);
+
+    if (!targetUser) {
+      return {
+        success: false as const,
+        error: "User not found.",
+      };
+    }
+
+    const blockedRelationship = await db.friendship.findFirst({
+      where: {
+        requesterId: currentUser.id,
+        addresseeId: targetUser.id,
+        status: "BLOCKED",
+      },
+    });
+
+    if (!blockedRelationship) {
+      return {
+        success: false as const,
+        error: "Blocked relationship not found.",
+      };
+    }
+
+    await db.friendship.delete({
+      where: {
+        id: blockedRelationship.id,
+      },
+    });
+
+    revalidatePath(`/profile/${targetUser.username}`);
+    revalidatePath(`/profile/${currentUser.username}`);
+    revalidatePath("/friends");
+    revalidatePath("/friends/requests");
+
+    return {
+      success: true as const,
+      message: "User unblocked successfully.",
+    };
+  } catch (error) {
+    console.error(
+      "unblockUserAction failed:",
+      error,
+    );
+
+    return {
+      success: false as const,
+      error: "Failed to unblock user. Please try again.",
     };
   }
 }

@@ -4,6 +4,32 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
+async function getBlockedRelationship(
+  currentUserId: string,
+  targetUserId: string,
+) {
+  return db.friendship.findFirst({
+    where: {
+      status: "BLOCKED",
+      OR: [
+        {
+          requesterId: currentUserId,
+          addresseeId: targetUserId,
+        },
+        {
+          requesterId: targetUserId,
+          addresseeId: currentUserId,
+        },
+      ],
+    },
+    select: {
+      id: true,
+      requesterId: true,
+      addresseeId: true,
+    },
+  });
+}
+
 export async function followUserAction(targetUserId: string) {
   try {
     const currentUser = await getCurrentUser();
@@ -40,6 +66,18 @@ export async function followUserAction(targetUserId: string) {
       };
     }
 
+    const blockedRelationship = await getBlockedRelationship(
+      currentUser.id,
+      targetUser.id,
+    );
+
+    if (blockedRelationship) {
+      return {
+        success: false as const,
+        error: "You cannot follow this user.",
+      };
+    }
+
     const existingFollow = await db.follow.findUnique({
       where: {
         followerId_followingId: {
@@ -63,7 +101,6 @@ export async function followUserAction(targetUserId: string) {
       },
     });
 
-    // Create notification for the followed user
     await db.notification.create({
       data: {
         recipientId: targetUser.id,

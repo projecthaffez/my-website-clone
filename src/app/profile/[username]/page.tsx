@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { FollowButton } from "./FollowButton";
 import { FriendRequestButton } from "./FriendRequestButton";
+import { BlockButton } from "./BlockButton";
 
 interface ProfilePageProps {
   params: Promise<{
@@ -61,49 +62,73 @@ export default async function ProfilePage({
   const isOwnProfile = currentUser?.id === profile.id;
 
   let isFollowing = false;
+  let isBlocked = false;
 
   let friendshipState: RelationshipState = "NONE";
   let friendshipRequestId: string | null = null;
 
   if (currentUser && !isOwnProfile) {
-    const [follow, friendship] = await Promise.all([
-      db.follow.findUnique({
-        where: {
-          followerId_followingId: {
-            followerId: currentUser.id,
-            followingId: profile.id,
+    const [follow, friendship, blockedRelationship] =
+      await Promise.all([
+        db.follow.findUnique({
+          where: {
+            followerId_followingId: {
+              followerId: currentUser.id,
+              followingId: profile.id,
+            },
           },
-        },
-        select: {
-          followerId: true,
-        },
-      }),
+          select: {
+            followerId: true,
+          },
+        }),
 
-      db.friendship.findFirst({
-        where: {
-          OR: [
-            {
-              requesterId: currentUser.id,
-              addresseeId: profile.id,
-            },
-            {
-              requesterId: profile.id,
-              addresseeId: currentUser.id,
-            },
-          ],
-        },
-        select: {
-          id: true,
-          requesterId: true,
-          addresseeId: true,
-          status: true,
-        },
-      }),
-    ]);
+        db.friendship.findFirst({
+          where: {
+            OR: [
+              {
+                requesterId: currentUser.id,
+                addresseeId: profile.id,
+              },
+              {
+                requesterId: profile.id,
+                addresseeId: currentUser.id,
+              },
+            ],
+          },
+          select: {
+            id: true,
+            requesterId: true,
+            addresseeId: true,
+            status: true,
+          },
+        }),
+
+        db.friendship.findFirst({
+          where: {
+            status: "BLOCKED",
+            OR: [
+              {
+                requesterId: currentUser.id,
+                addresseeId: profile.id,
+              },
+              {
+                requesterId: profile.id,
+                addresseeId: currentUser.id,
+              },
+            ],
+          },
+          select: {
+            id: true,
+            requesterId: true,
+            addresseeId: true,
+          },
+        }),
+      ]);
 
     isFollowing = Boolean(follow);
+    isBlocked = Boolean(blockedRelationship);
 
-    if (friendship) {
+    if (friendship && friendship.status !== "BLOCKED") {
       friendshipRequestId = friendship.id;
 
       if (friendship.status === "ACCEPTED") {
@@ -128,7 +153,7 @@ export default async function ProfilePage({
       <div className="mx-auto max-w-5xl px-4 py-6">
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
           {/* Cover */}
-          <div className="relative h-56 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 sm:h-72">
+          <div className="h-64 bg-slate-800">
             {profile.coverUrl && (
               <img
                 src={profile.coverUrl}
@@ -186,15 +211,24 @@ export default async function ProfilePage({
                   </Link>
                 ) : currentUser ? (
                   <>
-                    <FollowButton
-                      targetUserId={profile.id}
-                      initialFollowing={isFollowing}
-                    />
+                    {!isBlocked && (
+                      <>
+                        <FollowButton
+                          targetUserId={profile.id}
+                          initialFollowing={isFollowing}
+                        />
 
-                    <FriendRequestButton
+                        <FriendRequestButton
+                          targetUserId={profile.id}
+                          initialState={friendshipState}
+                          initialRequestId={friendshipRequestId}
+                        />
+                      </>
+                    )}
+
+                    <BlockButton
                       targetUserId={profile.id}
-                      initialState={friendshipState}
-                      initialRequestId={friendshipRequestId}
+                      initialBlocked={isBlocked}
                     />
                   </>
                 ) : (
@@ -207,6 +241,14 @@ export default async function ProfilePage({
                 )}
               </div>
             </div>
+
+            {/* Blocked Notice */}
+            {isBlocked && currentUser && !isOwnProfile && (
+              <div className="mt-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                This user is blocked. Unblock them to restore
+                profile interactions.
+              </div>
+            )}
 
             {/* Bio */}
             {profile.bio && (
