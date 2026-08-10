@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { LikeButton } from "./LikeButton";
 import { SaveButton } from "./SaveButton";
+import { ShareButton } from "./ShareButton";
 import { CommentForm } from "./CommentForm";
 import { DeleteCommentButton } from "./DeleteCommentButton";
 import { ReplyButton } from "./ReplyButton";
@@ -263,6 +264,9 @@ export async function PostCard({
             🔖 Save
           </Link>
         )}
+
+        {/* Share */}
+        <ShareButton postId={post.id} />
       </div>
 
       {/* Comments */}
@@ -291,7 +295,6 @@ export async function PostCard({
                   key={comment.id}
                   className="rounded-xl bg-slate-950/70 p-3"
                 >
-                  {/* Comment */}
                   <div className="flex gap-3">
                     <Link
                       href={`/profile/${comment.author.username}`}
@@ -349,7 +352,6 @@ export async function PostCard({
                         {commentDate}
                       </p>
 
-                      {/* Comment Actions */}
                       <div className="mt-2 flex items-center gap-3">
                         {currentUser && (
                           <ReplyButton
