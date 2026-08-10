@@ -4,11 +4,6 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-type FriendshipStatus =
-  | "PENDING"
-  | "ACCEPTED"
-  | "REJECTED";
-
 async function getTargetUser(targetUserId: string) {
   return db.user.findUnique({
     where: {
@@ -31,14 +26,16 @@ export async function sendFriendRequestAction(
     if (!currentUser) {
       return {
         success: false as const,
-        error: "You must be logged in to send friend requests.",
+        error:
+          "You must be logged in to send friend requests.",
       };
     }
 
     if (!targetUserId || targetUserId === currentUser.id) {
       return {
         success: false as const,
-        error: "You cannot send a friend request to yourself.",
+        error:
+          "You cannot send a friend request to yourself.",
       };
     }
 
@@ -93,8 +90,20 @@ export async function sendFriendRequestAction(
           },
         });
 
+        await db.notification.create({
+          data: {
+            recipientId: targetUser.id,
+            actorId: currentUser.id,
+            type: "FRIEND_REQUEST",
+            targetId: existingRequest.id,
+            targetUrl: "/friends/requests",
+          },
+        });
+
         revalidatePath(`/profile/${targetUser.username}`);
         revalidatePath(`/profile/${currentUser.username}`);
+        revalidatePath("/friends/requests");
+        revalidatePath("/notifications");
 
         return {
           success: true as const,
@@ -103,27 +112,46 @@ export async function sendFriendRequestAction(
       }
     }
 
-    await db.friendship.create({
+    const request = await db.friendship.create({
       data: {
         requesterId: currentUser.id,
         addresseeId: targetUser.id,
         status: "PENDING",
       },
+      select: {
+        id: true,
+      },
+    });
+
+    await db.notification.create({
+      data: {
+        recipientId: targetUser.id,
+        actorId: currentUser.id,
+        type: "FRIEND_REQUEST",
+        targetId: request.id,
+        targetUrl: "/friends/requests",
+      },
     });
 
     revalidatePath(`/profile/${targetUser.username}`);
     revalidatePath(`/profile/${currentUser.username}`);
+    revalidatePath("/friends/requests");
+    revalidatePath("/notifications");
 
     return {
       success: true as const,
       message: "Friend request sent.",
     };
   } catch (error) {
-    console.error("sendFriendRequestAction failed:", error);
+    console.error(
+      "sendFriendRequestAction failed:",
+      error,
+    );
 
     return {
       success: false as const,
-      error: "Failed to send friend request. Please try again.",
+      error:
+        "Failed to send friend request. Please try again.",
     };
   }
 }
@@ -171,7 +199,8 @@ export async function acceptFriendRequestAction(
     if (request.addresseeId !== currentUser.id) {
       return {
         success: false as const,
-        error: "You are not authorized to accept this request.",
+        error:
+          "You are not authorized to accept this request.",
       };
     }
 
@@ -191,15 +220,31 @@ export async function acceptFriendRequestAction(
       },
     });
 
+    await db.notification.create({
+      data: {
+        recipientId: request.requesterId,
+        actorId: currentUser.id,
+        type: "FRIEND_ACCEPT",
+        targetId: request.id,
+        targetUrl: `/profile/${currentUser.username}`,
+      },
+    });
+
     revalidatePath(`/profile/${request.requester.username}`);
     revalidatePath(`/profile/${request.addressee.username}`);
+    revalidatePath("/friends");
+    revalidatePath("/friends/requests");
+    revalidatePath("/notifications");
 
     return {
       success: true as const,
       message: "Friend request accepted.",
     };
   } catch (error) {
-    console.error("acceptFriendRequestAction failed:", error);
+    console.error(
+      "acceptFriendRequestAction failed:",
+      error,
+    );
 
     return {
       success: false as const,
@@ -249,7 +294,8 @@ export async function rejectFriendRequestAction(
     if (request.addresseeId !== currentUser.id) {
       return {
         success: false as const,
-        error: "You are not authorized to reject this request.",
+        error:
+          "You are not authorized to reject this request.",
       };
     }
 
@@ -271,13 +317,17 @@ export async function rejectFriendRequestAction(
 
     revalidatePath(`/profile/${request.requester.username}`);
     revalidatePath(`/profile/${request.addressee.username}`);
+    revalidatePath("/friends/requests");
 
     return {
       success: true as const,
       message: "Friend request rejected.",
     };
   } catch (error) {
-    console.error("rejectFriendRequestAction failed:", error);
+    console.error(
+      "rejectFriendRequestAction failed:",
+      error,
+    );
 
     return {
       success: false as const,
@@ -331,13 +381,17 @@ export async function cancelFriendRequestAction(
 
     revalidatePath(`/profile/${targetUser.username}`);
     revalidatePath(`/profile/${currentUser.username}`);
+    revalidatePath("/friends/requests");
 
     return {
       success: true as const,
       message: "Friend request cancelled.",
     };
   } catch (error) {
-    console.error("cancelFriendRequestAction failed:", error);
+    console.error(
+      "cancelFriendRequestAction failed:",
+      error,
+    );
 
     return {
       success: false as const,
@@ -407,16 +461,24 @@ export async function removeFriendAction(
       },
     });
 
-    revalidatePath(`/profile/${friendship.requester.username}`);
-    revalidatePath(`/profile/${friendship.addressee.username}`);
+    revalidatePath(
+      `/profile/${friendship.requester.username}`,
+    );
+    revalidatePath(
+      `/profile/${friendship.addressee.username}`,
+    );
     revalidatePath(`/profile/${currentUser.username}`);
+    revalidatePath("/friends");
 
     return {
       success: true as const,
       message: "Friend removed.",
     };
   } catch (error) {
-    console.error("removeFriendAction failed:", error);
+    console.error(
+      "removeFriendAction failed:",
+      error,
+    );
 
     return {
       success: false as const,

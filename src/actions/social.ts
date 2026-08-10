@@ -63,8 +63,20 @@ export async function followUserAction(targetUserId: string) {
       },
     });
 
+    // Create notification for the followed user
+    await db.notification.create({
+      data: {
+        recipientId: targetUser.id,
+        actorId: currentUser.id,
+        type: "FOLLOW",
+        targetId: currentUser.id,
+        targetUrl: `/profile/${currentUser.username}`,
+      },
+    });
+
     revalidatePath(`/profile/${targetUser.username}`);
     revalidatePath(`/profile/${currentUser.username}`);
+    revalidatePath("/notifications");
 
     return {
       success: true as const,
