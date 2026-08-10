@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { PostComposer } from "@/components/posts/PostComposer";
 import { PostCard } from "@/components/posts/PostCard";
+import { SearchBar } from "@/components/search/SearchBar";
 
 export default async function HomePage() {
   const currentUser = await getCurrentUser();
@@ -202,39 +203,48 @@ export default async function HomePage() {
     <main className="min-h-screen bg-slate-950 text-white">
       {/* Top Navigation */}
       <header className="border-b border-white/10 bg-slate-950/95">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
           <Link
             href="/"
-            className="text-xl font-bold tracking-tight"
+            className="shrink-0 text-xl font-bold tracking-tight"
           >
             Nexus
           </Link>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
+            <SearchBar />
+
             <Link
               href={`/profile/${currentUser.username}`}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
+              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
             >
               Profile
             </Link>
 
             <Link
               href="/friends/requests"
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
+              className="hidden shrink-0 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 sm:block"
             >
               Requests
             </Link>
 
             <Link
               href="/friends"
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
+              className="hidden shrink-0 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 sm:block"
             >
               Friends
             </Link>
 
             <Link
+              href="/messages"
+              className="shrink-0 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
+            >
+              Messages
+            </Link>
+
+            <Link
               href="/notifications"
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
+              className="hidden shrink-0 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 sm:block"
             >
               Notifications
             </Link>
