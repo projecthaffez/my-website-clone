@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { FollowButton } from "./FollowButton";
 
 interface ProfilePageProps {
   params: Promise<{
@@ -49,7 +50,26 @@ export default async function ProfilePage({
   }
 
   const currentUser = await getCurrentUser();
+
   const isOwnProfile = currentUser?.id === profile.id;
+
+  let isFollowing = false;
+
+  if (currentUser && !isOwnProfile) {
+    const follow = await db.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: currentUser.id,
+          followingId: profile.id,
+        },
+      },
+      select: {
+        followerId: true,
+      },
+    });
+
+    isFollowing = Boolean(follow);
+  }
 
   const memberSince = new Intl.DateTimeFormat("en-US", {
     month: "long",
@@ -71,9 +91,10 @@ export default async function ProfilePage({
             )}
           </div>
 
-          {/* Profile header */}
+          {/* Profile Header */}
           <div className="relative px-6 pb-6">
             <div className="-mt-16 flex flex-col gap-5 sm:flex-row sm:items-end">
+              {/* Avatar */}
               <div className="h-32 w-32 shrink-0 overflow-hidden rounded-full border-4 border-slate-900 bg-slate-800">
                 {profile.avatarUrl ? (
                   <img
@@ -88,6 +109,7 @@ export default async function ProfilePage({
                 )}
               </div>
 
+              {/* Name */}
               <div className="flex-1 pb-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-bold sm:text-3xl">
@@ -101,15 +123,30 @@ export default async function ProfilePage({
                   )}
                 </div>
 
-                <p className="text-slate-400">@{profile.username}</p>
+                <p className="text-slate-400">
+                  @{profile.username}
+                </p>
               </div>
 
-              {isOwnProfile && (
+              {/* Actions */}
+              {isOwnProfile ? (
                 <Link
                   href="/settings/profile"
                   className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold transition hover:bg-white/10"
                 >
                   Edit Profile
+                </Link>
+              ) : currentUser ? (
+                <FollowButton
+                  targetUserId={profile.id}
+                  initialFollowing={isFollowing}
+                />
+              ) : (
+                <Link
+                  href="/login"
+                  className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold transition hover:bg-blue-500"
+                >
+                  Log In to Follow
                 </Link>
               )}
             </div>
@@ -121,7 +158,7 @@ export default async function ProfilePage({
               </p>
             )}
 
-            {/* Meta */}
+            {/* Profile Information */}
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-400">
               {profile.location && (
                 <span>📍 {profile.location}</span>
@@ -147,6 +184,7 @@ export default async function ProfilePage({
                 <strong className="text-lg">
                   {profile._count.followers}
                 </strong>
+
                 <span className="ml-2 text-sm text-slate-400">
                   Followers
                 </span>
@@ -156,6 +194,7 @@ export default async function ProfilePage({
                 <strong className="text-lg">
                   {profile._count.following}
                 </strong>
+
                 <span className="ml-2 text-sm text-slate-400">
                   Following
                 </span>
@@ -165,6 +204,7 @@ export default async function ProfilePage({
                 <strong className="text-lg">
                   {profile._count.sentFriendRequests}
                 </strong>
+
                 <span className="ml-2 text-sm text-slate-400">
                   Friends
                 </span>
@@ -172,7 +212,7 @@ export default async function ProfilePage({
             </div>
           </div>
 
-          {/* Profile navigation */}
+          {/* Profile Navigation */}
           <nav className="flex overflow-x-auto border-t border-white/10">
             <Link
               href={`/profile/${profile.username}`}
@@ -204,15 +244,17 @@ export default async function ProfilePage({
           </nav>
         </div>
 
-        {/* Future posts area */}
+        {/* Posts Placeholder */}
         <section className="mt-6 rounded-2xl border border-white/10 bg-slate-900 p-8 text-center">
           <h2 className="text-lg font-semibold">
-            {isOwnProfile ? "Your Posts" : `${profile.name}'s Posts`}
+            {isOwnProfile
+              ? "Your Posts"
+              : `${profile.name}'s Posts`}
           </h2>
 
           <p className="mt-2 text-sm text-slate-400">
-            Posts will appear here when the News Feed and Post Engine
-            are implemented in Phase 4.
+            Posts will appear here when the News Feed and Post
+            Engine are implemented in Phase 4.
           </p>
         </section>
       </div>
