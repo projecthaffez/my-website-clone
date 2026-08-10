@@ -3,12 +3,19 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { FollowButton } from "./FollowButton";
+import { FriendRequestButton } from "./FriendRequestButton";
 
 interface ProfilePageProps {
   params: Promise<{
     username: string;
   }>;
 }
+
+type RelationshipState =
+  | "NONE"
+  | "PENDING_SENT"
+  | "PENDING_RECEIVED"
+  | "ACCEPTED";
 
 export default async function ProfilePage({
   params,
@@ -55,20 +62,60 @@ export default async function ProfilePage({
 
   let isFollowing = false;
 
+  let friendshipState: RelationshipState = "NONE";
+  let friendshipRequestId: string | null = null;
+
   if (currentUser && !isOwnProfile) {
-    const follow = await db.follow.findUnique({
-      where: {
-        followerId_followingId: {
-          followerId: currentUser.id,
-          followingId: profile.id,
+    const [follow, friendship] = await Promise.all([
+      db.follow.findUnique({
+        where: {
+          followerId_followingId: {
+            followerId: currentUser.id,
+            followingId: profile.id,
+          },
         },
-      },
-      select: {
-        followerId: true,
-      },
-    });
+        select: {
+          followerId: true,
+        },
+      }),
+
+      db.friendship.findFirst({
+        where: {
+          OR: [
+            {
+              requesterId: currentUser.id,
+              addresseeId: profile.id,
+            },
+            {
+              requesterId: profile.id,
+              addresseeId: currentUser.id,
+            },
+          ],
+        },
+        select: {
+          id: true,
+          requesterId: true,
+          addresseeId: true,
+          status: true,
+        },
+      }),
+    ]);
 
     isFollowing = Boolean(follow);
+
+    if (friendship) {
+      friendshipRequestId = friendship.id;
+
+      if (friendship.status === "ACCEPTED") {
+        friendshipState = "ACCEPTED";
+      } else if (friendship.status === "PENDING") {
+        if (friendship.requesterId === currentUser.id) {
+          friendshipState = "PENDING_SENT";
+        } else {
+          friendshipState = "PENDING_RECEIVED";
+        }
+      }
+    }
   }
 
   const memberSince = new Intl.DateTimeFormat("en-US", {
@@ -129,26 +176,36 @@ export default async function ProfilePage({
               </div>
 
               {/* Actions */}
-              {isOwnProfile ? (
-                <Link
-                  href="/settings/profile"
-                  className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold transition hover:bg-white/10"
-                >
-                  Edit Profile
-                </Link>
-              ) : currentUser ? (
-                <FollowButton
-                  targetUserId={profile.id}
-                  initialFollowing={isFollowing}
-                />
-              ) : (
-                <Link
-                  href="/login"
-                  className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold transition hover:bg-blue-500"
-                >
-                  Log In to Follow
-                </Link>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {isOwnProfile ? (
+                  <Link
+                    href="/settings/profile"
+                    className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold transition hover:bg-white/10"
+                  >
+                    Edit Profile
+                  </Link>
+                ) : currentUser ? (
+                  <>
+                    <FollowButton
+                      targetUserId={profile.id}
+                      initialFollowing={isFollowing}
+                    />
+
+                    <FriendRequestButton
+                      targetUserId={profile.id}
+                      initialState={friendshipState}
+                      initialRequestId={friendshipRequestId}
+                    />
+                  </>
+                ) : (
+                  <Link
+                    href="/login"
+                    className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold transition hover:bg-blue-500"
+                  >
+                    Log In
+                  </Link>
+                )}
+              </div>
             </div>
 
             {/* Bio */}
@@ -210,38 +267,38 @@ export default async function ProfilePage({
                 </span>
               </div>
             </div>
+
+            {/* Profile Navigation */}
+            <nav className="mt-6 flex overflow-x-auto border-t border-white/10">
+              <Link
+                href={`/profile/${profile.username}`}
+                className="border-b-2 border-blue-500 px-6 py-4 text-sm font-semibold text-white"
+              >
+                Posts
+              </Link>
+
+              <Link
+                href={`/profile/${profile.username}?tab=about`}
+                className="px-6 py-4 text-sm text-slate-400 hover:text-white"
+              >
+                About
+              </Link>
+
+              <Link
+                href={`/profile/${profile.username}?tab=photos`}
+                className="px-6 py-4 text-sm text-slate-400 hover:text-white"
+              >
+                Photos
+              </Link>
+
+              <Link
+                href={`/profile/${profile.username}?tab=friends`}
+                className="px-6 py-4 text-sm text-slate-400 hover:text-white"
+              >
+                Friends
+              </Link>
+            </nav>
           </div>
-
-          {/* Profile Navigation */}
-          <nav className="flex overflow-x-auto border-t border-white/10">
-            <Link
-              href={`/profile/${profile.username}`}
-              className="border-b-2 border-blue-500 px-6 py-4 text-sm font-semibold text-white"
-            >
-              Posts
-            </Link>
-
-            <Link
-              href={`/profile/${profile.username}?tab=about`}
-              className="px-6 py-4 text-sm text-slate-400 hover:text-white"
-            >
-              About
-            </Link>
-
-            <Link
-              href={`/profile/${profile.username}?tab=photos`}
-              className="px-6 py-4 text-sm text-slate-400 hover:text-white"
-            >
-              Photos
-            </Link>
-
-            <Link
-              href={`/profile/${profile.username}?tab=friends`}
-              className="px-6 py-4 text-sm text-slate-400 hover:text-white"
-            >
-              Friends
-            </Link>
-          </nav>
         </div>
 
         {/* Posts Placeholder */}
