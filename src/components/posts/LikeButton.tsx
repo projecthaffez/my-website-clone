@@ -19,6 +19,10 @@ export function LikeButton({
   const [isPending, startTransition] = useTransition();
 
   function handleLike() {
+    if (isPending) {
+      return;
+    }
+
     const previousLiked = liked;
     const previousCount = count;
 
@@ -33,12 +37,21 @@ export function LikeButton({
     );
 
     startTransition(async () => {
-      const result = await togglePostLikeAction(postId);
+      const result =
+        await togglePostLikeAction(postId);
 
       if (!result.success) {
+        // Rollback if server action failed
         setLiked(previousLiked);
         setCount(previousCount);
+        return;
       }
+
+      /*
+       * Use the authoritative state returned
+       * from the server.
+       */
+      setLiked(result.liked);
     });
   }
 
@@ -47,18 +60,25 @@ export function LikeButton({
       type="button"
       onClick={handleLike}
       disabled={isPending}
+      aria-pressed={liked}
+      aria-label={
+        liked
+          ? "Unlike this post"
+          : "Like this post"
+      }
       className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition ${
         liked
           ? "bg-blue-500/15 text-blue-400"
           : "text-slate-400 hover:bg-white/5 hover:text-white"
       } disabled:cursor-not-allowed disabled:opacity-60`}
     >
-      <span className="text-lg">
+      <span className="text-base">
         {liked ? "♥" : "♡"}
       </span>
 
       <span>
-        {count} {count === 1 ? "Like" : "Likes"}
+        {count}{" "}
+        {count === 1 ? "Like" : "Likes"}
       </span>
     </button>
   );

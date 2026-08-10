@@ -4,14 +4,17 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-export async function togglePostLikeAction(postId: string) {
+export async function togglePostLikeAction(
+  postId: string,
+) {
   try {
     const currentUser = await getCurrentUser();
 
     if (!currentUser) {
       return {
         success: false as const,
-        error: "You must be logged in to like a post.",
+        liked: false,
+        error: "You must be logged in to like posts.",
       };
     }
 
@@ -21,38 +24,32 @@ export async function togglePostLikeAction(postId: string) {
       },
       select: {
         id: true,
-        isDeleted: true,
         authorId: true,
-        author: {
-          select: {
-            id: true,
-            username: true,
-          },
-        },
+        isDeleted: true,
       },
     });
 
     if (!post || post.isDeleted) {
       return {
         success: false as const,
+        liked: false,
         error: "Post not found.",
       };
     }
 
-    const existingReaction = await db.reaction.findUnique({
-      where: {
-        userId_postId: {
-          userId: currentUser.id,
-          postId,
+    const existingReaction =
+      await db.reaction.findUnique({
+        where: {
+          userId_postId: {
+            userId: currentUser.id,
+            postId,
+          },
         },
-      },
-      select: {
-        id: true,
-        type: true,
-      },
-    });
+        select: {
+          id: true,
+        },
+      });
 
-    // Unlike
     if (existingReaction) {
       await db.reaction.delete({
         where: {
@@ -61,17 +58,17 @@ export async function togglePostLikeAction(postId: string) {
       });
 
       revalidatePath("/");
-      revalidatePath(`/profile/${currentUser.username}`);
-      revalidatePath(`/profile/${post.author.username}`);
-      revalidatePath("/notifications");
+      revalidatePath(
+        `/profile/${currentUser.username}`,
+      );
 
       return {
         success: true as const,
         liked: false,
+        message: "Post unliked.",
       };
     }
 
-    // Like
     await db.reaction.create({
       data: {
         userId: currentUser.id,
@@ -80,27 +77,30 @@ export async function togglePostLikeAction(postId: string) {
       },
     });
 
-    // Do not notify users when they like their own post
+    /*
+     * Do not create a notification for your own post.
+     */
     if (post.authorId !== currentUser.id) {
       await db.notification.create({
         data: {
           recipientId: post.authorId,
           actorId: currentUser.id,
           type: "LIKE",
-          targetId: post.id,
-          targetUrl: `/profile/${post.author.username}`,
+          targetId: postId,
+          targetUrl: "/",
         },
       });
     }
 
     revalidatePath("/");
-    revalidatePath(`/profile/${currentUser.username}`);
-    revalidatePath(`/profile/${post.author.username}`);
-    revalidatePath("/notifications");
+    revalidatePath(
+      `/profile/${currentUser.username}`,
+    );
 
     return {
       success: true as const,
       liked: true,
+      message: "Post liked.",
     };
   } catch (error) {
     console.error(
@@ -110,7 +110,8 @@ export async function togglePostLikeAction(postId: string) {
 
     return {
       success: false as const,
-      error: "Failed to update like. Please try again.",
+      liked: false,
+      error: "Failed to update post reaction.",
     };
   }
 }
