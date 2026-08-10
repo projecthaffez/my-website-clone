@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { FormEvent, useState } from "react";
 import { createReplyAction } from "@/actions/comment";
 
 interface ReplyFormProps {
@@ -15,26 +15,36 @@ export function ReplyForm({
   onCancel,
 }: ReplyFormProps) {
   const [content, setContent] = useState("");
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [isPending, startTransition] = useTransition();
 
-  function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>,
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
     setError("");
 
-    if (!content.trim()) {
-      setError("Write a reply first.");
+    const cleanContent = content.trim();
+
+    if (!cleanContent) {
+      setError("Reply cannot be empty.");
       return;
     }
 
-    startTransition(async () => {
+    if (cleanContent.length > 2000) {
+      setError(
+        "Reply cannot exceed 2000 characters.",
+      );
+      return;
+    }
+
+    setLoading(true);
+
+    try {
       const result = await createReplyAction(
-        postId,
         parentId,
-        content,
+        cleanContent,
       );
 
       if (!result.success) {
@@ -43,54 +53,71 @@ export function ReplyForm({
       }
 
       setContent("");
+
+      if (onCancel) {
+        onCancel();
+      }
+
       window.location.reload();
-    });
+    } catch (error) {
+      console.error(
+        "Reply submission failed:",
+        error,
+      );
+
+      setError(
+        "Failed to add reply. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="mt-3"
+      className="mt-3 space-y-2"
     >
-      <div className="flex gap-2">
-        <input
-          value={content}
-          onChange={(event) =>
-            setContent(event.target.value)
-          }
-          maxLength={2000}
-          disabled={isPending}
-          placeholder="Write a reply..."
-          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-500 focus:border-blue-500 disabled:opacity-60"
-        />
+      <textarea
+        value={content}
+        onChange={(event) =>
+          setContent(event.target.value)
+        }
+        placeholder="Write a reply..."
+        rows={2}
+        maxLength={2000}
+        disabled={loading}
+        className="w-full resize-none rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-blue-500/50"
+      />
 
-        <button
-          type="submit"
-          disabled={
-            isPending || !content.trim()
-          }
-          className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isPending ? "..." : "Reply"}
-        </button>
+      {error && (
+        <p className="text-xs text-red-400">
+          {error}
+        </p>
+      )}
 
+      <div className="flex justify-end gap-2">
         {onCancel && (
           <button
             type="button"
             onClick={onCancel}
-            disabled={isPending}
-            className="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
+            disabled={loading}
+            className="rounded-lg border border-white/10 px-4 py-2 text-xs text-slate-400 transition hover:bg-white/5 hover:text-white"
           >
             Cancel
           </button>
         )}
-      </div>
 
-      {error && (
-        <p className="mt-2 text-xs text-red-400">
-          {error}
-        </p>
-      )}
+        <button
+          type="submit"
+          disabled={
+            loading || !content.trim()
+          }
+          className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading ? "Replying..." : "Reply"}
+        </button>
+      </div>
     </form>
   );
 }

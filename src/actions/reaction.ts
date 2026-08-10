@@ -22,6 +22,13 @@ export async function togglePostLikeAction(postId: string) {
       select: {
         id: true,
         isDeleted: true,
+        authorId: true,
+        author: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
       },
     });
 
@@ -45,6 +52,7 @@ export async function togglePostLikeAction(postId: string) {
       },
     });
 
+    // Unlike
     if (existingReaction) {
       await db.reaction.delete({
         where: {
@@ -54,6 +62,8 @@ export async function togglePostLikeAction(postId: string) {
 
       revalidatePath("/");
       revalidatePath(`/profile/${currentUser.username}`);
+      revalidatePath(`/profile/${post.author.username}`);
+      revalidatePath("/notifications");
 
       return {
         success: true as const,
@@ -61,6 +71,7 @@ export async function togglePostLikeAction(postId: string) {
       };
     }
 
+    // Like
     await db.reaction.create({
       data: {
         userId: currentUser.id,
@@ -69,15 +80,33 @@ export async function togglePostLikeAction(postId: string) {
       },
     });
 
+    // Do not notify users when they like their own post
+    if (post.authorId !== currentUser.id) {
+      await db.notification.create({
+        data: {
+          recipientId: post.authorId,
+          actorId: currentUser.id,
+          type: "LIKE",
+          targetId: post.id,
+          targetUrl: `/profile/${post.author.username}`,
+        },
+      });
+    }
+
     revalidatePath("/");
     revalidatePath(`/profile/${currentUser.username}`);
+    revalidatePath(`/profile/${post.author.username}`);
+    revalidatePath("/notifications");
 
     return {
       success: true as const,
       liked: true,
     };
   } catch (error) {
-    console.error("togglePostLikeAction failed:", error);
+    console.error(
+      "togglePostLikeAction failed:",
+      error,
+    );
 
     return {
       success: false as const,

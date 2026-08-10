@@ -20,81 +20,86 @@ interface PostCardProps {
   };
 }
 
-export async function PostCard({ post }: PostCardProps) {
+export async function PostCard({
+  post,
+}: PostCardProps) {
   const currentUser = await getCurrentUser();
 
-  const [likeCount, currentUserReaction, comments] =
-    await Promise.all([
-      db.reaction.count({
-        where: {
-          postId: post.id,
-          type: "LIKE",
-        },
-      }),
+  const [
+    likeCount,
+    currentUserReaction,
+    comments,
+  ] = await Promise.all([
+    db.reaction.count({
+      where: {
+        postId: post.id,
+        type: "LIKE",
+      },
+    }),
 
-      currentUser
-        ? db.reaction.findUnique({
-            where: {
-              userId_postId: {
-                userId: currentUser.id,
-                postId: post.id,
-              },
-            },
-            select: {
-              type: true,
-            },
-          })
-        : null,
-
-      db.comment.findMany({
-        where: {
-          postId: post.id,
-          isDeleted: false,
-          parentId: null,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: 5,
-        select: {
-          id: true,
-          content: true,
-          createdAt: true,
-          author: {
-            select: {
-              id: true,
-              username: true,
-              name: true,
-              avatarUrl: true,
-              isVerified: true,
+    currentUser
+      ? db.reaction.findUnique({
+          where: {
+            userId_postId: {
+              userId: currentUser.id,
+              postId: post.id,
             },
           },
-          replies: {
-            where: {
-              isDeleted: false,
-            },
-            orderBy: {
-              createdAt: "asc",
-            },
-            take: 10,
-            select: {
-              id: true,
-              content: true,
-              createdAt: true,
-              author: {
-                select: {
-                  id: true,
-                  username: true,
-                  name: true,
-                  avatarUrl: true,
-                  isVerified: true,
-                },
+          select: {
+            type: true,
+          },
+        })
+      : null,
+
+    db.comment.findMany({
+      where: {
+        postId: post.id,
+        isDeleted: false,
+        parentId: null,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 5,
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+        author: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            avatarUrl: true,
+            isVerified: true,
+          },
+        },
+        replies: {
+          where: {
+            isDeleted: false,
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+          take: 5,
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
+            author: {
+              select: {
+                id: true,
+                username: true,
+                name: true,
+                avatarUrl: true,
+                isVerified: true,
               },
             },
           },
         },
-      }),
-    ]);
+      },
+    }),
+  ]);
 
   const commentCount = await db.comment.count({
     where: {
@@ -103,15 +108,16 @@ export async function PostCard({ post }: PostCardProps) {
     },
   });
 
-  const formattedDate = new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(post.createdAt);
+  const formattedDate =
+    new Intl.DateTimeFormat("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(post.createdAt);
 
   return (
     <article className="rounded-2xl border border-white/10 bg-slate-900 p-5">
       {/* Author */}
-      <div className="flex items-center gap-3">
+      <div className="flex gap-3">
         <Link
           href={`/profile/${post.author.username}`}
           className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-slate-800"
@@ -124,7 +130,9 @@ export async function PostCard({ post }: PostCardProps) {
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center font-bold text-slate-400">
-              {post.author.name.charAt(0).toUpperCase()}
+              {post.author.name
+                .charAt(0)
+                .toUpperCase()}
             </div>
           )}
         </Link>
@@ -146,7 +154,9 @@ export async function PostCard({ post }: PostCardProps) {
           </div>
 
           <div className="flex gap-2 text-xs text-slate-500">
-            <span>@{post.author.username}</span>
+            <span>
+              @{post.author.username}
+            </span>
             <span>•</span>
             <span>{formattedDate}</span>
           </div>
@@ -163,7 +173,9 @@ export async function PostCard({ post }: PostCardProps) {
         {currentUser ? (
           <LikeButton
             postId={post.id}
-            initialLiked={currentUserReaction?.type === "LIKE"}
+            initialLiked={
+              currentUserReaction?.type === "LIKE"
+            }
             initialCount={likeCount}
           />
         ) : (
@@ -172,7 +184,9 @@ export async function PostCard({ post }: PostCardProps) {
             className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
           >
             ♡ {likeCount}{" "}
-            {likeCount === 1 ? "Like" : "Likes"}
+            {likeCount === 1
+              ? "Like"
+              : "Likes"}
           </Link>
         )}
       </div>
@@ -181,26 +195,29 @@ export async function PostCard({ post }: PostCardProps) {
       <div className="mt-4 border-t border-white/10 pt-4">
         <div className="mb-3 text-sm font-semibold text-slate-300">
           {commentCount}{" "}
-          {commentCount === 1 ? "Comment" : "Comments"}
+          {commentCount === 1
+            ? "Comment"
+            : "Comments"}
         </div>
 
         {comments.length > 0 && (
           <div className="space-y-3">
             {comments.map((comment) => {
-              const commentDate = new Intl.DateTimeFormat(
-                "en-US",
-                {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                },
-              ).format(comment.createdAt);
+              const commentDate =
+                new Intl.DateTimeFormat(
+                  "en-US",
+                  {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  },
+                ).format(comment.createdAt);
 
               return (
                 <div
                   key={comment.id}
                   className="rounded-xl bg-slate-950/70 p-3"
                 >
-                  {/* Main Comment */}
+                  {/* Comment */}
                   <div className="flex gap-3">
                     <Link
                       href={`/profile/${comment.author.username}`}
@@ -208,8 +225,12 @@ export async function PostCard({ post }: PostCardProps) {
                     >
                       {comment.author.avatarUrl ? (
                         <img
-                          src={comment.author.avatarUrl}
-                          alt={comment.author.name}
+                          src={
+                            comment.author.avatarUrl
+                          }
+                          alt={
+                            comment.author.name
+                          }
                           className="h-full w-full object-cover"
                         />
                       ) : (
@@ -237,7 +258,11 @@ export async function PostCard({ post }: PostCardProps) {
                         )}
 
                         <span className="text-xs text-slate-600">
-                          @{comment.author.username}
+                          @
+                          {
+                            comment.author
+                              .username
+                          }
                         </span>
                       </div>
 
@@ -250,7 +275,7 @@ export async function PostCard({ post }: PostCardProps) {
                       </p>
 
                       {/* Comment Actions */}
-                      <div className="flex items-center gap-4">
+                      <div className="mt-2 flex items-center gap-3">
                         {currentUser && (
                           <ReplyButton
                             postId={post.id}
@@ -258,9 +283,12 @@ export async function PostCard({ post }: PostCardProps) {
                           />
                         )}
 
-                        {currentUser?.id === comment.author.id && (
+                        {currentUser?.id ===
+                          comment.author.id && (
                           <DeleteCommentButton
-                            commentId={comment.id}
+                            commentId={
+                              comment.id
+                            }
                           />
                         )}
                       </div>
@@ -268,77 +296,122 @@ export async function PostCard({ post }: PostCardProps) {
                   </div>
 
                   {/* Replies */}
-                  {comment.replies.length > 0 && (
-                    <div className="ml-12 mt-3 space-y-2 border-l border-white/10 pl-3">
-                      {comment.replies.map((reply) => {
-                        const replyDate =
-                          new Intl.DateTimeFormat("en-US", {
-                            dateStyle: "medium",
-                            timeStyle: "short",
-                          }).format(reply.createdAt);
+                  {comment.replies.length >
+                    0 && (
+                    <div className="ml-12 mt-3 space-y-3 border-l border-white/10 pl-4">
+                      {comment.replies.map(
+                        (reply) => {
+                          const replyDate =
+                            new Intl.DateTimeFormat(
+                              "en-US",
+                              {
+                                dateStyle:
+                                  "medium",
+                                timeStyle:
+                                  "short",
+                              },
+                            ).format(
+                              reply.createdAt,
+                            );
 
-                        return (
-                          <div
-                            key={reply.id}
-                            className="flex gap-3 rounded-xl bg-slate-900/70 p-3"
-                          >
-                            <Link
-                              href={`/profile/${reply.author.username}`}
-                              className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-slate-800"
+                          return (
+                            <div
+                              key={
+                                reply.id
+                              }
+                              className="flex gap-3"
                             >
-                              {reply.author.avatarUrl ? (
-                                <img
-                                  src={reply.author.avatarUrl}
-                                  alt={reply.author.name}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <div className="flex h-full w-full items-center justify-center text-xs font-bold text-slate-400">
-                                  {reply.author.name
-                                    .charAt(0)
-                                    .toUpperCase()}
-                                </div>
-                              )}
-                            </Link>
-
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Link
-                                  href={`/profile/${reply.author.username}`}
-                                  className="text-sm font-semibold hover:text-blue-400"
-                                >
-                                  {reply.author.name}
-                                </Link>
-
-                                {reply.author.isVerified && (
-                                  <span className="text-xs text-blue-400">
-                                    ✓
-                                  </span>
+                              <Link
+                                href={`/profile/${reply.author.username}`}
+                                className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-slate-800"
+                              >
+                                {reply
+                                  .author
+                                  .avatarUrl ? (
+                                  <img
+                                    src={
+                                      reply
+                                        .author
+                                        .avatarUrl
+                                    }
+                                    alt={
+                                      reply
+                                        .author
+                                        .name
+                                    }
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-xs font-bold text-slate-400">
+                                    {reply
+                                      .author
+                                      .name
+                                      .charAt(
+                                        0,
+                                      )
+                                      .toUpperCase()}
+                                  </div>
                                 )}
+                              </Link>
 
-                                <span className="text-xs text-slate-600">
-                                  @{reply.author.username}
-                                </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Link
+                                    href={`/profile/${reply.author.username}`}
+                                    className="text-sm font-semibold hover:text-blue-400"
+                                  >
+                                    {
+                                      reply
+                                        .author
+                                        .name
+                                    }
+                                  </Link>
+
+                                  {reply
+                                    .author
+                                    .isVerified && (
+                                    <span className="text-xs text-blue-400">
+                                      ✓
+                                    </span>
+                                  )}
+
+                                  <span className="text-xs text-slate-600">
+                                    @
+                                    {
+                                      reply
+                                        .author
+                                        .username
+                                    }
+                                  </span>
+                                </div>
+
+                                <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-300">
+                                  {
+                                    reply.content
+                                  }
+                                </p>
+
+                                <p className="mt-1 text-xs text-slate-600">
+                                  {
+                                    replyDate
+                                  }
+                                </p>
+
+                                {currentUser?.id ===
+                                  reply
+                                    .author
+                                    .id && (
+                                  <DeleteCommentButton
+                                    commentId={
+                                      reply.id
+                                    }
+                                  />
+                                )}
                               </div>
-
-                              <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-300">
-                                {reply.content}
-                              </p>
-
-                              <p className="mt-1 text-xs text-slate-600">
-                                {replyDate}
-                              </p>
-
-                              {currentUser?.id ===
-                                reply.author.id && (
-                                <DeleteCommentButton
-                                  commentId={reply.id}
-                                />
-                              )}
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        },
+                      )}
                     </div>
                   )}
                 </div>
@@ -353,8 +426,11 @@ export async function PostCard({ post }: PostCardProps) {
           </p>
         )}
 
+        {/* New Comment */}
         {currentUser ? (
-          <CommentForm postId={post.id} />
+          <CommentForm
+            postId={post.id}
+          />
         ) : (
           <Link
             href="/login"
