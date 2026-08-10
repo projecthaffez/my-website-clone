@@ -6,6 +6,7 @@ import { FollowButton } from "./FollowButton";
 import { FriendRequestButton } from "./FriendRequestButton";
 import { BlockButton } from "./BlockButton";
 import { MessageButton } from "./MessageButton";
+import { PostCard } from "@/components/posts/PostCard";
 
 interface ProfilePageProps {
   params: Promise<{
@@ -203,6 +204,73 @@ export default async function ProfilePage({
     month: "long",
     year: "numeric",
   }).format(profile.createdAt);
+
+  /*
+   * Load visible posts for this profile.
+   *
+   * PUBLIC:
+   * Everyone who can view the profile can see them.
+   *
+   * FRIENDS:
+   * Only the profile owner and accepted friends can see them.
+   *
+   * PRIVATE:
+   * Only the profile owner can see them.
+   */
+  const profilePosts = await db.post.findMany({
+    where: {
+      authorId: profile.id,
+      isDeleted: false,
+
+      OR: [
+        {
+          visibility: "PUBLIC",
+        },
+
+        ...(isOwnProfile || isFriend
+          ? [
+              {
+                visibility: "FRIENDS" as const,
+              },
+            ]
+          : []),
+
+        ...(isOwnProfile
+          ? [
+              {
+                visibility: "PRIVATE" as const,
+              },
+            ]
+          : []),
+      ],
+    },
+
+    orderBy: [
+      {
+        isPinned: "desc",
+      },
+      {
+        createdAt: "desc",
+      },
+    ],
+
+    take: 20,
+
+    select: {
+      id: true,
+      content: true,
+      createdAt: true,
+
+      author: {
+        select: {
+          username: true,
+          name: true,
+          avatarUrl: true,
+          isVerified: true,
+        },
+      },
+    },
+  });
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -403,18 +471,44 @@ export default async function ProfilePage({
           </div>
         </div>
 
-        {/* Posts Placeholder */}
-        <section className="mt-6 rounded-2xl border border-white/10 bg-slate-900 p-8 text-center">
-          <h2 className="text-lg font-semibold">
-            {isOwnProfile
-              ? "Your Posts"
-              : `${profile.name}'s Posts`}
-          </h2>
+        {/* Profile Posts */}
+        <section className="mt-6 space-y-4">
+          <div>
+            <h2 className="text-xl font-bold">
+              {isOwnProfile
+                ? "Your Posts"
+                : `${profile.name}'s Posts`}
+            </h2>
 
-          <p className="mt-2 text-sm text-slate-400">
-            Posts will appear here when the News Feed and Post
-            Engine are implemented in Phase 4.
-          </p>
+            <p className="mt-1 text-sm text-slate-500">
+              {isOwnProfile
+                ? "Your latest posts."
+                : `Latest posts shared by ${profile.name}.`}
+            </p>
+          </div>
+
+          {profilePosts.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-slate-900 p-10 text-center">
+              <div className="text-4xl">📝</div>
+
+              <h3 className="mt-4 text-lg font-semibold">
+                No posts yet
+              </h3>
+
+              <p className="mt-2 text-sm text-slate-400">
+                {isOwnProfile
+                  ? "You have not shared any posts yet."
+                  : "This user has not shared any visible posts yet."}
+              </p>
+            </div>
+          ) : (
+            profilePosts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+              />
+            ))
+          )}
         </section>
       </div>
     </main>
