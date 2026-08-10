@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { FollowButton } from "./FollowButton";
 import { FriendRequestButton } from "./FriendRequestButton";
 import { BlockButton } from "./BlockButton";
+import { MessageButton } from "./MessageButton";
 
 interface ProfilePageProps {
   params: Promise<{
@@ -277,6 +278,10 @@ export default async function ProfilePage({
                           targetUserId={profile.id}
                           initialState={friendshipState}
                           initialRequestId={friendshipRequestId}
+                        />
+
+                        <MessageButton
+                          targetUserId={profile.id}
                         />
                       </>
                     )}
