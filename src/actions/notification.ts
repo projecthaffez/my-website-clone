@@ -19,10 +19,13 @@ export async function getNotificationsAction() {
     where: {
       recipientId: currentUser.id,
     },
+
     orderBy: {
       createdAt: "desc",
     },
+
     take: 30,
+
     include: {
       actor: {
         select: {
@@ -81,9 +84,11 @@ export async function markNotificationReadAction(
       where: {
         id: notificationId,
       },
+
       select: {
         id: true,
         recipientId: true,
+        isRead: true,
       },
     });
 
@@ -94,6 +99,10 @@ export async function markNotificationReadAction(
       };
     }
 
+    /*
+     * Security:
+     * A user can only modify their own notifications.
+     */
     if (notification.recipientId !== currentUser.id) {
       return {
         success: false as const,
@@ -101,14 +110,20 @@ export async function markNotificationReadAction(
       };
     }
 
-    await db.notification.update({
-      where: {
-        id: notificationId,
-      },
-      data: {
-        isRead: true,
-      },
-    });
+    /*
+     * Avoid unnecessary database writes.
+     */
+    if (!notification.isRead) {
+      await db.notification.update({
+        where: {
+          id: notificationId,
+        },
+
+        data: {
+          isRead: true,
+        },
+      });
+    }
 
     revalidatePath("/notifications");
 
@@ -144,6 +159,7 @@ export async function markAllNotificationsReadAction() {
         recipientId: currentUser.id,
         isRead: false,
       },
+
       data: {
         isRead: true,
       },
