@@ -38,6 +38,7 @@ export default async function ProfilePage({
       website: true,
       isVerified: true,
       createdAt: true,
+      profileVisibility: true,
 
       _count: {
         select: {
@@ -66,6 +67,7 @@ export default async function ProfilePage({
 
   let friendshipState: RelationshipState = "NONE";
   let friendshipRequestId: string | null = null;
+  let isFriend = false;
 
   if (currentUser && !isOwnProfile) {
     const [follow, friendship, blockedRelationship] =
@@ -133,6 +135,7 @@ export default async function ProfilePage({
 
       if (friendship.status === "ACCEPTED") {
         friendshipState = "ACCEPTED";
+        isFriend = true;
       } else if (friendship.status === "PENDING") {
         if (friendship.requesterId === currentUser.id) {
           friendshipState = "PENDING_SENT";
@@ -141,6 +144,58 @@ export default async function ProfilePage({
         }
       }
     }
+  }
+
+  /*
+   * Profile visibility rules:
+   *
+   * PUBLIC  -> everyone can view
+   * FRIENDS -> owner and accepted friends can view
+   * PRIVATE -> owner only
+   */
+  const canViewProfile =
+    isOwnProfile ||
+    profile.profileVisibility === "PUBLIC" ||
+    (profile.profileVisibility === "FRIENDS" && isFriend);
+
+  if (!canViewProfile) {
+    return (
+      <main className="min-h-screen bg-slate-950 px-4 py-10 text-white">
+        <div className="mx-auto max-w-2xl">
+          <div className="rounded-2xl border border-white/10 bg-slate-900 p-8 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/5 text-2xl">
+              🔒
+            </div>
+
+            <h1 className="mt-5 text-2xl font-bold">
+              This profile is private
+            </h1>
+
+            <p className="mt-2 text-sm text-slate-400">
+              {profile.profileVisibility === "FRIENDS"
+                ? "This user only allows friends to view their profile."
+                : "This user has made their profile private."}
+            </p>
+
+            <div className="mt-6 flex justify-center gap-3">
+              <Link
+                href="/"
+                className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold transition hover:bg-blue-500"
+              >
+                Go Home
+              </Link>
+
+              {currentUser && !isOwnProfile && (
+                <BlockButton
+                  targetUserId={profile.id}
+                  initialBlocked={isBlocked}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   const memberSince = new Intl.DateTimeFormat("en-US", {

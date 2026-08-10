@@ -16,6 +16,12 @@ enum Role {
   ADMIN
 }
 
+enum ProfileVisibility {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
 enum FriendshipStatus {
   PENDING
   ACCEPTED
@@ -99,6 +105,10 @@ model User {
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  profileVisibility    ProfileVisibility @default(PUBLIC)
+  allowFriendRequests  Boolean           @default(true)
+  allowMessages        Boolean           @default(true)
 
   // Relationships
   sessions               Session[]

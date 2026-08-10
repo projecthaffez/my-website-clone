@@ -13,6 +13,7 @@ async function getTargetUser(targetUserId: string) {
       id: true,
       username: true,
       isBanned: true,
+      allowFriendRequests: true,
     },
   });
 }
@@ -48,6 +49,14 @@ export async function sendFriendRequestAction(
       };
     }
 
+    if (!targetUser.allowFriendRequests) {
+      return {
+        success: false as const,
+        error:
+          "This user is not accepting friend requests.",
+      };
+    }
+
     const existingRequest = await db.friendship.findFirst({
       where: {
         OR: [
@@ -67,21 +76,24 @@ export async function sendFriendRequestAction(
       if (existingRequest.status === "BLOCKED") {
         return {
           success: false as const,
-          error: "You cannot send a friend request to this user.",
+          error:
+            "You cannot send a friend request to this user.",
         };
       }
 
       if (existingRequest.status === "ACCEPTED") {
         return {
           success: false as const,
-          error: "You are already friends with this user.",
+          error:
+            "You are already friends with this user.",
         };
       }
 
       if (existingRequest.status === "PENDING") {
         return {
           success: false as const,
-          error: "A friend request already exists.",
+          error:
+            "A friend request already exists.",
         };
       }
 
@@ -107,8 +119,12 @@ export async function sendFriendRequestAction(
           },
         });
 
-        revalidatePath(`/profile/${targetUser.username}`);
-        revalidatePath(`/profile/${currentUser.username}`);
+        revalidatePath(
+          `/profile/${targetUser.username}`,
+        );
+        revalidatePath(
+          `/profile/${currentUser.username}`,
+        );
         revalidatePath("/friends/requests");
         revalidatePath("/notifications");
 
@@ -237,8 +253,12 @@ export async function acceptFriendRequestAction(
       },
     });
 
-    revalidatePath(`/profile/${request.requester.username}`);
-    revalidatePath(`/profile/${request.addressee.username}`);
+    revalidatePath(
+      `/profile/${request.requester.username}`,
+    );
+    revalidatePath(
+      `/profile/${request.addressee.username}`,
+    );
     revalidatePath("/friends");
     revalidatePath("/friends/requests");
     revalidatePath("/notifications");
@@ -322,8 +342,12 @@ export async function rejectFriendRequestAction(
       },
     });
 
-    revalidatePath(`/profile/${request.requester.username}`);
-    revalidatePath(`/profile/${request.addressee.username}`);
+    revalidatePath(
+      `/profile/${request.requester.username}`,
+    );
+    revalidatePath(
+      `/profile/${request.addressee.username}`,
+    );
     revalidatePath("/friends/requests");
 
     return {
@@ -386,8 +410,12 @@ export async function cancelFriendRequestAction(
       },
     });
 
-    revalidatePath(`/profile/${targetUser.username}`);
-    revalidatePath(`/profile/${currentUser.username}`);
+    revalidatePath(
+      `/profile/${targetUser.username}`,
+    );
+    revalidatePath(
+      `/profile/${currentUser.username}`,
+    );
     revalidatePath("/friends/requests");
 
     return {
@@ -523,20 +551,21 @@ export async function blockUserAction(
       };
     }
 
-    const existingRelationship = await db.friendship.findFirst({
-      where: {
-        OR: [
-          {
-            requesterId: currentUser.id,
-            addresseeId: targetUser.id,
-          },
-          {
-            requesterId: targetUser.id,
-            addresseeId: currentUser.id,
-          },
-        ],
-      },
-    });
+    const existingRelationship =
+      await db.friendship.findFirst({
+        where: {
+          OR: [
+            {
+              requesterId: currentUser.id,
+              addresseeId: targetUser.id,
+            },
+            {
+              requesterId: targetUser.id,
+              addresseeId: currentUser.id,
+            },
+          ],
+        },
+      });
 
     if (existingRelationship) {
       if (
@@ -584,8 +613,12 @@ export async function blockUserAction(
       },
     });
 
-    revalidatePath(`/profile/${targetUser.username}`);
-    revalidatePath(`/profile/${currentUser.username}`);
+    revalidatePath(
+      `/profile/${targetUser.username}`,
+    );
+    revalidatePath(
+      `/profile/${currentUser.username}`,
+    );
     revalidatePath("/friends");
     revalidatePath("/friends/requests");
 
@@ -601,7 +634,8 @@ export async function blockUserAction(
 
     return {
       success: false as const,
-      error: "Failed to block user. Please try again.",
+      error:
+        "Failed to block user. Please try again.",
     };
   }
 }
@@ -635,13 +669,14 @@ export async function unblockUserAction(
       };
     }
 
-    const blockedRelationship = await db.friendship.findFirst({
-      where: {
-        requesterId: currentUser.id,
-        addresseeId: targetUser.id,
-        status: "BLOCKED",
-      },
-    });
+    const blockedRelationship =
+      await db.friendship.findFirst({
+        where: {
+          requesterId: currentUser.id,
+          addresseeId: targetUser.id,
+          status: "BLOCKED",
+        },
+      });
 
     if (!blockedRelationship) {
       return {
@@ -656,8 +691,12 @@ export async function unblockUserAction(
       },
     });
 
-    revalidatePath(`/profile/${targetUser.username}`);
-    revalidatePath(`/profile/${currentUser.username}`);
+    revalidatePath(
+      `/profile/${targetUser.username}`,
+    );
+    revalidatePath(
+      `/profile/${currentUser.username}`,
+    );
     revalidatePath("/friends");
     revalidatePath("/friends/requests");
 
@@ -673,7 +712,8 @@ export async function unblockUserAction(
 
     return {
       success: false as const,
-      error: "Failed to unblock user. Please try again.",
+      error:
+        "Failed to unblock user. Please try again.",
     };
   }
 }
