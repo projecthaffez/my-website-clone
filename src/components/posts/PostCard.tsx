@@ -6,6 +6,7 @@ import { SaveButton } from "./SaveButton";
 import { CommentForm } from "./CommentForm";
 import { DeleteCommentButton } from "./DeleteCommentButton";
 import { ReplyButton } from "./ReplyButton";
+import { PostManagement } from "./PostManagement";
 
 interface PostCardProps {
   post: {
@@ -31,6 +32,7 @@ export async function PostCard({
     currentUserReaction,
     savedPost,
     comments,
+    postMeta,
   ] = await Promise.all([
     db.reaction.count({
       where: {
@@ -124,6 +126,15 @@ export async function PostCard({
         },
       },
     }),
+
+    db.post.findUnique({
+      where: {
+        id: post.id,
+      },
+      select: {
+        isPinned: true,
+      },
+    }),
   ]);
 
   const commentCount = await db.comment.count({
@@ -138,6 +149,9 @@ export async function PostCard({
       dateStyle: "medium",
       timeStyle: "short",
     }).format(post.createdAt);
+
+  const isPostOwner =
+    currentUser?.username === post.author.username;
 
   return (
     <article className="rounded-2xl border border-white/10 bg-slate-900 p-5">
@@ -162,7 +176,7 @@ export async function PostCard({
           )}
         </Link>
 
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Link
               href={`/profile/${post.author.username}`}
@@ -174,6 +188,12 @@ export async function PostCard({
             {post.author.isVerified && (
               <span className="text-xs text-blue-400">
                 ✓
+              </span>
+            )}
+
+            {postMeta?.isPinned && (
+              <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-xs text-blue-400">
+                📌 Pinned
               </span>
             )}
           </div>
@@ -189,6 +209,16 @@ export async function PostCard({
           </div>
         </div>
       </div>
+
+      {/* Post Management */}
+      {isPostOwner && (
+        <PostManagement
+          postId={post.id}
+          initialPinned={
+            postMeta?.isPinned ?? false
+          }
+        />
+      )}
 
       {/* Post Content */}
       <div className="mt-5 whitespace-pre-wrap break-words text-sm leading-7 text-slate-200">
@@ -270,8 +300,7 @@ export async function PostCard({
                       {comment.author.avatarUrl ? (
                         <img
                           src={
-                            comment.author
-                              .avatarUrl
+                            comment.author.avatarUrl
                           }
                           alt={
                             comment.author.name

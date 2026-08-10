@@ -13,10 +13,10 @@ export default async function HomePage() {
     return (
       <main className="min-h-screen bg-slate-950 text-white">
         <section className="flex min-h-screen items-center justify-center px-4">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-blue-400">
+          <div className="w-full max-w-4xl text-center">
+            <div className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-400">
               Nexus Social Platform
-            </p>
+            </div>
 
             <h1 className="mt-5 text-5xl font-bold tracking-tight sm:text-6xl">
               Connect. Share. Discover.
@@ -58,62 +58,66 @@ export default async function HomePage() {
    * Accepted friendships whose FRIENDS-only posts
    * should be visible.
    */
-  const [following, friendships, blockedRelationships] =
-    await Promise.all([
-      db.follow.findMany({
-        where: {
-          followerId: currentUser.id,
-        },
-        select: {
-          followingId: true,
-        },
-      }),
+  const [
+    following,
+    friendships,
+    blockedRelationships,
+  ] = await Promise.all([
+    db.follow.findMany({
+      where: {
+        followerId: currentUser.id,
+      },
+      select: {
+        followingId: true,
+      },
+    }),
 
-      db.friendship.findMany({
-        where: {
-          status: "ACCEPTED",
-          OR: [
-            {
-              requesterId: currentUser.id,
-            },
-            {
-              addresseeId: currentUser.id,
-            },
-          ],
-        },
-        select: {
-          requesterId: true,
-          addresseeId: true,
-        },
-      }),
+    db.friendship.findMany({
+      where: {
+        status: "ACCEPTED",
+        OR: [
+          {
+            requesterId: currentUser.id,
+          },
+          {
+            addresseeId: currentUser.id,
+          },
+        ],
+      },
+      select: {
+        requesterId: true,
+        addresseeId: true,
+      },
+    }),
 
-      db.friendship.findMany({
-        where: {
-          status: "BLOCKED",
-          OR: [
-            {
-              requesterId: currentUser.id,
-            },
-            {
-              addresseeId: currentUser.id,
-            },
-          ],
-        },
-        select: {
-          requesterId: true,
-          addresseeId: true,
-        },
-      }),
-    ]);
+    db.friendship.findMany({
+      where: {
+        status: "BLOCKED",
+        OR: [
+          {
+            requesterId: currentUser.id,
+          },
+          {
+            addresseeId: currentUser.id,
+          },
+        ],
+      },
+      select: {
+        requesterId: true,
+        addresseeId: true,
+      },
+    }),
+  ]);
 
   const followingIds = following.map(
     (item) => item.followingId,
   );
 
-  const friendIds = friendships.map((friendship) =>
-    friendship.requesterId === currentUser.id
-      ? friendship.addresseeId
-      : friendship.requesterId,
+  const friendIds = friendships.map(
+    (friendship) =>
+      friendship.requesterId === currentUser.id
+        ? friendship.addresseeId
+        : friendship.requesterId,
   );
 
   const blockedUserIds = blockedRelationships.map(
@@ -125,7 +129,6 @@ export default async function HomePage() {
 
   /*
    * Feed authors:
-   *
    * - current user
    * - people the current user follows
    * - accepted friends
@@ -137,7 +140,8 @@ export default async function HomePage() {
       ...friendIds,
     ]),
   ).filter(
-    (userId) => !blockedUserIds.includes(userId),
+    (userId) =>
+      !blockedUserIds.includes(userId),
   );
 
   /*
@@ -202,8 +206,8 @@ export default async function HomePage() {
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       {/* Top Navigation */}
-      <header className="border-b border-white/10 bg-slate-950/95">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3">
           <Link
             href="/"
             className="shrink-0 text-xl font-bold tracking-tight"
@@ -248,6 +252,13 @@ export default async function HomePage() {
             >
               Notifications
             </Link>
+
+            <Link
+              href="/saved"
+              className="hidden shrink-0 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 sm:block"
+            >
+              Saved
+            </Link>
           </div>
         </div>
       </header>
@@ -264,19 +275,24 @@ export default async function HomePage() {
           </p>
         </div>
 
-        <PostComposer userName={currentUser.name} />
+        <PostComposer
+          userName={currentUser.name}
+        />
 
         <section className="mt-6 space-y-4">
           {posts.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-900 p-10 text-center">
-              <div className="text-4xl">📝</div>
+              <div className="text-4xl">
+                📝
+              </div>
 
               <h2 className="mt-4 text-lg font-semibold">
                 Your feed is empty
               </h2>
 
               <p className="mt-2 text-sm text-slate-400">
-                Follow people or add friends to see their posts here.
+                Follow people or add friends to see
+                their posts here.
               </p>
 
               <div className="mt-6 flex justify-center gap-3">

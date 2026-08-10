@@ -4,14 +4,17 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-export async function createPostAction(content: string) {
+export async function createPostAction(
+  content: string,
+) {
   try {
     const currentUser = await getCurrentUser();
 
     if (!currentUser) {
       return {
         success: false as const,
-        error: "You must be logged in to create a post.",
+        error:
+          "You must be logged in to create a post.",
       };
     }
 
@@ -27,7 +30,8 @@ export async function createPostAction(content: string) {
     if (cleanContent.length > 5000) {
       return {
         success: false as const,
-        error: "Post cannot exceed 5000 characters.",
+        error:
+          "Post cannot exceed 5000 characters.",
       };
     }
 
@@ -43,7 +47,9 @@ export async function createPostAction(content: string) {
     });
 
     revalidatePath("/");
-    revalidatePath(`/profile/${currentUser.username}`);
+    revalidatePath(
+      `/profile/${currentUser.username}`,
+    );
 
     return {
       success: true as const,
@@ -51,11 +57,199 @@ export async function createPostAction(content: string) {
       postId: post.id,
     };
   } catch (error) {
-    console.error("createPostAction failed:", error);
+    console.error(
+      "createPostAction failed:",
+      error,
+    );
 
     return {
       success: false as const,
-      error: "Failed to create post. Please try again.",
+      error:
+        "Failed to create post. Please try again.",
+    };
+  }
+}
+
+export async function deletePostAction(
+  postId: string,
+) {
+  try {
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      return {
+        success: false as const,
+        error: "You must be logged in.",
+      };
+    }
+
+    const post = await db.post.findUnique({
+      where: {
+        id: postId,
+      },
+      select: {
+        id: true,
+        authorId: true,
+        isDeleted: true,
+      },
+    });
+
+    if (!post) {
+      return {
+        success: false as const,
+        error: "Post not found.",
+      };
+    }
+
+    if (post.authorId !== currentUser.id) {
+      return {
+        success: false as const,
+        error:
+          "You can only delete your own posts.",
+      };
+    }
+
+    if (post.isDeleted) {
+      return {
+        success: false as const,
+        error: "Post has already been deleted.",
+      };
+    }
+
+    /*
+     * Soft delete:
+     * Keep the database record so related
+     * reactions/comments remain consistent.
+     */
+    await db.post.update({
+      where: {
+        id: postId,
+      },
+      data: {
+        isDeleted: true,
+      },
+    });
+
+    revalidatePath("/");
+    revalidatePath(
+      `/profile/${currentUser.username}`,
+    );
+
+    return {
+      success: true as const,
+      message: "Post deleted successfully.",
+    };
+  } catch (error) {
+    console.error(
+      "deletePostAction failed:",
+      error,
+    );
+
+    return {
+      success: false as const,
+      error:
+        "Failed to delete post. Please try again.",
+    };
+  }
+}
+
+export async function togglePinPostAction(
+  postId: string,
+) {
+  try {
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      return {
+        success: false as const,
+        pinned: false,
+        error: "You must be logged in.",
+      };
+    }
+
+    const post = await db.post.findUnique({
+      where: {
+        id: postId,
+      },
+      select: {
+        id: true,
+        authorId: true,
+        isDeleted: true,
+        isPinned: true,
+      },
+    });
+
+    if (!post || post.isDeleted) {
+      return {
+        success: false as const,
+        pinned: false,
+        error: "Post not found.",
+      };
+    }
+
+    if (post.authorId !== currentUser.id) {
+      return {
+        success: false as const,
+        pinned: false,
+        error:
+          "You can only pin your own posts.",
+      };
+    }
+
+    const nextPinned = !post.isPinned;
+
+    /*
+     * Only one pinned post per user.
+     * If pinning this post, unpin the user's
+     * other pinned posts first.
+     */
+    if (nextPinned) {
+      await db.post.updateMany({
+        where: {
+          authorId: currentUser.id,
+          isPinned: true,
+          id: {
+            not: postId,
+          },
+        },
+        data: {
+          isPinned: false,
+        },
+      });
+    }
+
+    await db.post.update({
+      where: {
+        id: postId,
+      },
+      data: {
+        isPinned: nextPinned,
+      },
+    });
+
+    revalidatePath("/");
+    revalidatePath(
+      `/profile/${currentUser.username}`,
+    );
+
+    return {
+      success: true as const,
+      pinned: nextPinned,
+      message: nextPinned
+        ? "Post pinned successfully."
+        : "Post unpinned successfully.",
+    };
+  } catch (error) {
+    console.error(
+      "togglePinPostAction failed:",
+      error,
+    );
+
+    return {
+      success: false as const,
+      pinned: false,
+      error:
+        "Failed to update pinned post.",
     };
   }
 }
