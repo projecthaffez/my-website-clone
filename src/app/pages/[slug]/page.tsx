@@ -9,6 +9,7 @@ import { PagePostComposer } from "@/components/pages/PagePostComposer";
 import { EditPageForm } from "@/components/pages/EditPageForm";
 import { DeletePageButton } from "@/components/pages/DeletePageButton";
 import { PostCard } from "@/components/posts/PostCard";
+import { ReportButton } from "@/components/reports/ReportButton";
 
 interface PageProps {
   params: Promise<{
@@ -231,14 +232,23 @@ export default async function PageProfile({
                 </div>
               </div>
 
-              {!isOwner && (
-                <PageFollowButton
-                  pageId={page.id}
-                  initialFollowing={
-                    isFollowing
-                  }
-                />
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {!isOwner && (
+                  <>
+                    <PageFollowButton
+                      pageId={page.id}
+                      initialFollowing={
+                        isFollowing
+                      }
+                    />
+
+                    <ReportButton
+                      targetType="PAGE"
+                      targetId={page.id}
+                    />
+                  </>
+                )}
+              </div>
             </div>
 
             {page.description && (

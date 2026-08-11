@@ -7,6 +7,7 @@ import { FriendRequestButton } from "./FriendRequestButton";
 import { BlockButton } from "./BlockButton";
 import { MessageButton } from "./MessageButton";
 import { PostCard } from "@/components/posts/PostCard";
+import { ReportButton } from "@/components/reports/ReportButton";
 
 interface ProfilePageProps {
   params: Promise<{
@@ -29,6 +30,7 @@ export default async function ProfilePage({
     where: {
       username: username.toLowerCase(),
     },
+
     select: {
       id: true,
       username: true,
@@ -60,89 +62,118 @@ export default async function ProfilePage({
     notFound();
   }
 
-  const currentUser = await getCurrentUser();
+  const currentUser =
+    await getCurrentUser();
 
-  const isOwnProfile = currentUser?.id === profile.id;
+  const isOwnProfile =
+    currentUser?.id === profile.id;
 
   let isFollowing = false;
   let isBlocked = false;
 
-  let friendshipState: RelationshipState = "NONE";
-  let friendshipRequestId: string | null = null;
+  let friendshipState: RelationshipState =
+    "NONE";
+
+  let friendshipRequestId:
+    | string
+    | null = null;
+
   let isFriend = false;
 
   if (currentUser && !isOwnProfile) {
-    const [follow, friendship, blockedRelationship] =
-      await Promise.all([
-        db.follow.findUnique({
-          where: {
-            followerId_followingId: {
-              followerId: currentUser.id,
-              followingId: profile.id,
+    const [
+      follow,
+      friendship,
+      blockedRelationship,
+    ] = await Promise.all([
+      db.follow.findUnique({
+        where: {
+          followerId_followingId: {
+            followerId: currentUser.id,
+            followingId: profile.id,
+          },
+        },
+
+        select: {
+          followerId: true,
+        },
+      }),
+
+      db.friendship.findFirst({
+        where: {
+          OR: [
+            {
+              requesterId: currentUser.id,
+              addresseeId: profile.id,
             },
-          },
-          select: {
-            followerId: true,
-          },
-        }),
+            {
+              requesterId: profile.id,
+              addresseeId: currentUser.id,
+            },
+          ],
+        },
 
-        db.friendship.findFirst({
-          where: {
-            OR: [
-              {
-                requesterId: currentUser.id,
-                addresseeId: profile.id,
-              },
-              {
-                requesterId: profile.id,
-                addresseeId: currentUser.id,
-              },
-            ],
-          },
-          select: {
-            id: true,
-            requesterId: true,
-            addresseeId: true,
-            status: true,
-          },
-        }),
+        select: {
+          id: true,
+          requesterId: true,
+          addresseeId: true,
+          status: true,
+        },
+      }),
 
-        db.friendship.findFirst({
-          where: {
-            status: "BLOCKED",
-            OR: [
-              {
-                requesterId: currentUser.id,
-                addresseeId: profile.id,
-              },
-              {
-                requesterId: profile.id,
-                addresseeId: currentUser.id,
-              },
-            ],
-          },
-          select: {
-            id: true,
-            requesterId: true,
-            addresseeId: true,
-          },
-        }),
-      ]);
+      db.friendship.findFirst({
+        where: {
+          status: "BLOCKED",
+
+          OR: [
+            {
+              requesterId: currentUser.id,
+              addresseeId: profile.id,
+            },
+            {
+              requesterId: profile.id,
+              addresseeId: currentUser.id,
+            },
+          ],
+        },
+
+        select: {
+          id: true,
+          requesterId: true,
+          addresseeId: true,
+        },
+      }),
+    ]);
 
     isFollowing = Boolean(follow);
-    isBlocked = Boolean(blockedRelationship);
+    isBlocked =
+      Boolean(blockedRelationship);
 
-    if (friendship && friendship.status !== "BLOCKED") {
-      friendshipRequestId = friendship.id;
+    if (
+      friendship &&
+      friendship.status !== "BLOCKED"
+    ) {
+      friendshipRequestId =
+        friendship.id;
 
-      if (friendship.status === "ACCEPTED") {
+      if (
+        friendship.status ===
+        "ACCEPTED"
+      ) {
         friendshipState = "ACCEPTED";
         isFriend = true;
-      } else if (friendship.status === "PENDING") {
-        if (friendship.requesterId === currentUser.id) {
-          friendshipState = "PENDING_SENT";
+      } else if (
+        friendship.status === "PENDING"
+      ) {
+        if (
+          friendship.requesterId ===
+          currentUser.id
+        ) {
+          friendshipState =
+            "PENDING_SENT";
         } else {
-          friendshipState = "PENDING_RECEIVED";
+          friendshipState =
+            "PENDING_RECEIVED";
         }
       }
     }
@@ -157,8 +188,11 @@ export default async function ProfilePage({
    */
   const canViewProfile =
     isOwnProfile ||
-    profile.profileVisibility === "PUBLIC" ||
-    (profile.profileVisibility === "FRIENDS" && isFriend);
+    profile.profileVisibility ===
+      "PUBLIC" ||
+    (profile.profileVisibility ===
+      "FRIENDS" &&
+      isFriend);
 
   if (!canViewProfile) {
     return (
@@ -174,12 +208,13 @@ export default async function ProfilePage({
             </h1>
 
             <p className="mt-2 text-sm text-slate-400">
-              {profile.profileVisibility === "FRIENDS"
+              {profile.profileVisibility ===
+              "FRIENDS"
                 ? "This user only allows friends to view their profile."
                 : "This user has made their profile private."}
             </p>
 
-            <div className="mt-6 flex justify-center gap-3">
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Link
                 href="/"
                 className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold transition hover:bg-blue-500"
@@ -187,12 +222,24 @@ export default async function ProfilePage({
                 Go Home
               </Link>
 
-              {currentUser && !isOwnProfile && (
-                <BlockButton
-                  targetUserId={profile.id}
-                  initialBlocked={isBlocked}
-                />
-              )}
+              {currentUser &&
+                !isOwnProfile && (
+                  <>
+                    <ReportButton
+                      targetType="USER"
+                      targetId={profile.id}
+                    />
+
+                    <BlockButton
+                      targetUserId={
+                        profile.id
+                      }
+                      initialBlocked={
+                        isBlocked
+                      }
+                    />
+                  </>
+                )}
             </div>
           </div>
         </div>
@@ -200,77 +247,75 @@ export default async function ProfilePage({
     );
   }
 
-  const memberSince = new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    year: "numeric",
-  }).format(profile.createdAt);
+  const memberSince =
+    new Intl.DateTimeFormat(
+      "en-US",
+      {
+        month: "long",
+        year: "numeric",
+      },
+    ).format(profile.createdAt);
 
   /*
    * Load visible posts for this profile.
-   *
-   * PUBLIC:
-   * Everyone who can view the profile can see them.
-   *
-   * FRIENDS:
-   * Only the profile owner and accepted friends can see them.
-   *
-   * PRIVATE:
-   * Only the profile owner can see them.
    */
-  const profilePosts = await db.post.findMany({
-    where: {
-      authorId: profile.id,
-      isDeleted: false,
+  const profilePosts =
+    await db.post.findMany({
+      where: {
+        authorId: profile.id,
+        isDeleted: false,
 
-      OR: [
+        OR: [
+          {
+            visibility: "PUBLIC",
+          },
+
+          ...(isOwnProfile || isFriend
+            ? [
+                {
+                  visibility:
+                    "FRIENDS" as const,
+                },
+              ]
+            : []),
+
+          ...(isOwnProfile
+            ? [
+                {
+                  visibility:
+                    "PRIVATE" as const,
+                },
+              ]
+            : []),
+        ],
+      },
+
+      orderBy: [
         {
-          visibility: "PUBLIC",
+          isPinned: "desc",
         },
-
-        ...(isOwnProfile || isFriend
-          ? [
-              {
-                visibility: "FRIENDS" as const,
-              },
-            ]
-          : []),
-
-        ...(isOwnProfile
-          ? [
-              {
-                visibility: "PRIVATE" as const,
-              },
-            ]
-          : []),
+        {
+          createdAt: "desc",
+        },
       ],
-    },
 
-    orderBy: [
-      {
-        isPinned: "desc",
-      },
-      {
-        createdAt: "desc",
-      },
-    ],
+      take: 20,
 
-    take: 20,
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
 
-    select: {
-      id: true,
-      content: true,
-      createdAt: true,
-
-      author: {
-        select: {
-          username: true,
-          name: true,
-          avatarUrl: true,
-          isVerified: true,
+        author: {
+          select: {
+            username: true,
+            name: true,
+            avatarUrl: true,
+            isVerified: true,
+          },
         },
       },
-    },
-  });
+    });
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -278,12 +323,14 @@ export default async function ProfilePage({
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
           {/* Cover */}
           <div className="h-64 bg-slate-800">
-            {profile.coverUrl && (
+            {profile.coverUrl ? (
               <img
                 src={profile.coverUrl}
                 alt={`${profile.name}'s cover`}
                 className="h-full w-full object-cover"
               />
+            ) : (
+              <div className="h-full w-full bg-gradient-to-br from-slate-800 via-slate-900 to-blue-950" />
             )}
           </div>
 
@@ -300,7 +347,9 @@ export default async function ProfilePage({
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-4xl font-bold text-slate-400">
-                    {profile.name.charAt(0).toUpperCase()}
+                    {profile.name
+                      .charAt(0)
+                      .toUpperCase()}
                   </div>
                 )}
               </div>
@@ -338,25 +387,46 @@ export default async function ProfilePage({
                     {!isBlocked && (
                       <>
                         <FollowButton
-                          targetUserId={profile.id}
-                          initialFollowing={isFollowing}
+                          targetUserId={
+                            profile.id
+                          }
+                          initialFollowing={
+                            isFollowing
+                          }
                         />
 
                         <FriendRequestButton
-                          targetUserId={profile.id}
-                          initialState={friendshipState}
-                          initialRequestId={friendshipRequestId}
+                          targetUserId={
+                            profile.id
+                          }
+                          initialState={
+                            friendshipState
+                          }
+                          initialRequestId={
+                            friendshipRequestId
+                          }
                         />
 
                         <MessageButton
-                          targetUserId={profile.id}
+                          targetUserId={
+                            profile.id
+                          }
                         />
                       </>
                     )}
 
+                    <ReportButton
+                      targetType="USER"
+                      targetId={profile.id}
+                    />
+
                     <BlockButton
-                      targetUserId={profile.id}
-                      initialBlocked={isBlocked}
+                      targetUserId={
+                        profile.id
+                      }
+                      initialBlocked={
+                        isBlocked
+                      }
                     />
                   </>
                 ) : (
@@ -371,12 +441,15 @@ export default async function ProfilePage({
             </div>
 
             {/* Blocked Notice */}
-            {isBlocked && currentUser && !isOwnProfile && (
-              <div className="mt-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                This user is blocked. Unblock them to restore
-                profile interactions.
-              </div>
-            )}
+            {isBlocked &&
+              currentUser &&
+              !isOwnProfile && (
+                <div className="mt-5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                  This user is blocked.
+                  Unblock them to restore
+                  profile interactions.
+                </div>
+              )}
 
             {/* Bio */}
             {profile.bio && (
@@ -388,7 +461,9 @@ export default async function ProfilePage({
             {/* Profile Information */}
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-400">
               {profile.location && (
-                <span>📍 {profile.location}</span>
+                <span>
+                  📍 {profile.location}
+                </span>
               )}
 
               {profile.website && (
@@ -402,14 +477,17 @@ export default async function ProfilePage({
                 </a>
               )}
 
-              <span>Joined {memberSince}</span>
+              <span>
+                Joined {memberSince}
+              </span>
             </div>
 
             {/* Stats */}
             <div className="mt-6 flex flex-wrap gap-6 border-t border-white/10 pt-5">
               <div>
                 <strong className="text-lg">
-                  {profile._count.followers}
+                  {profile._count
+                    .followers}
                 </strong>
 
                 <span className="ml-2 text-sm text-slate-400">
@@ -419,7 +497,8 @@ export default async function ProfilePage({
 
               <div>
                 <strong className="text-lg">
-                  {profile._count.following}
+                  {profile._count
+                    .following}
                 </strong>
 
                 <span className="ml-2 text-sm text-slate-400">
@@ -429,7 +508,10 @@ export default async function ProfilePage({
 
               <div>
                 <strong className="text-lg">
-                  {profile._count.sentFriendRequests}
+                  {
+                    profile._count
+                      .sentFriendRequests
+                  }
                 </strong>
 
                 <span className="ml-2 text-sm text-slate-400">
@@ -487,9 +569,12 @@ export default async function ProfilePage({
             </p>
           </div>
 
-          {profilePosts.length === 0 ? (
+          {profilePosts.length ===
+          0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-900 p-10 text-center">
-              <div className="text-4xl">📝</div>
+              <div className="text-4xl">
+                📝
+              </div>
 
               <h3 className="mt-4 text-lg font-semibold">
                 No posts yet
@@ -502,12 +587,14 @@ export default async function ProfilePage({
               </p>
             </div>
           ) : (
-            profilePosts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-              />
-            ))
+            profilePosts.map(
+              (post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                />
+              ),
+            )
           )}
         </section>
       </div>

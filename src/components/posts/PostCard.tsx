@@ -9,6 +9,7 @@ import { DeleteCommentButton } from "./DeleteCommentButton";
 import { ReplyButton } from "./ReplyButton";
 import { PostManagement } from "./PostManagement";
 import { PagePostManagement } from "@/components/pages/PagePostManagement";
+import { ReportButton } from "@/components/reports/ReportButton";
 
 interface PostCardProps {
   post: {
@@ -28,7 +29,8 @@ interface PostCardProps {
 export async function PostCard({
   post,
 }: PostCardProps) {
-  const currentUser = await getCurrentUser();
+  const currentUser =
+    await getCurrentUser();
 
   const [
     likeCount,
@@ -160,10 +162,13 @@ export async function PostCard({
     });
 
   const formattedDate =
-    new Intl.DateTimeFormat("en-US", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(post.createdAt);
+    new Intl.DateTimeFormat(
+      "en-US",
+      {
+        dateStyle: "medium",
+        timeStyle: "short",
+      },
+    ).format(post.createdAt);
 
   const isPostOwner =
     currentUser?.username ===
@@ -313,6 +318,15 @@ export async function PostCard({
 
         {/* Share */}
         <ShareButton postId={post.id} />
+
+        {/* Report Post */}
+        {currentUser &&
+          !isPostOwner && (
+            <ReportButton
+              targetType="POST"
+              targetId={post.id}
+            />
+          )}
       </div>
 
       {/* Comments */}
@@ -409,7 +423,7 @@ export async function PostCard({
                         {commentDate}
                       </p>
 
-                      <div className="mt-2 flex items-center gap-3">
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
                         {currentUser && (
                           <ReplyButton
                             postId={post.id}
@@ -424,6 +438,18 @@ export async function PostCard({
                             .id && (
                           <DeleteCommentButton
                             commentId={
+                              comment.id
+                            }
+                          />
+                        )}
+
+                        {currentUser &&
+                          currentUser.id !==
+                            comment.author
+                              .id && (
+                          <ReportButton
+                            targetType="COMMENT"
+                            targetId={
                               comment.id
                             }
                           />
@@ -535,16 +561,31 @@ export async function PostCard({
                                   }
                                 </p>
 
-                                {currentUser?.id ===
-                                  reply
-                                    .author
-                                    .id && (
-                                  <DeleteCommentButton
-                                    commentId={
-                                      reply.id
-                                    }
-                                  />
-                                )}
+                                <div className="mt-2 flex flex-wrap items-center gap-3">
+                                  {currentUser?.id ===
+                                    reply
+                                      .author
+                                      .id && (
+                                    <DeleteCommentButton
+                                      commentId={
+                                        reply.id
+                                      }
+                                    />
+                                  )}
+
+                                  {currentUser &&
+                                    currentUser.id !==
+                                      reply
+                                        .author
+                                        .id && (
+                                      <ReportButton
+                                        targetType="COMMENT"
+                                        targetId={
+                                          reply.id
+                                        }
+                                      />
+                                    )}
+                                </div>
                               </div>
                             </div>
                           );

@@ -6,6 +6,7 @@ import { GroupMembershipButton } from "@/components/groups/GroupMembershipButton
 import { GroupPostComposer } from "@/components/groups/GroupPostComposer";
 import { GroupMembers } from "@/components/groups/GroupMembers";
 import { PostCard } from "@/components/posts/PostCard";
+import { ReportButton } from "@/components/reports/ReportButton";
 
 interface GroupPageProps {
   params: Promise<{
@@ -59,6 +60,7 @@ export default async function GroupPage({
         where: {
           userId: currentUser.id,
         },
+
         select: {
           role: true,
         },
@@ -68,9 +70,11 @@ export default async function GroupPage({
         where: {
           isDeleted: false,
         },
+
         orderBy: {
           createdAt: "desc",
         },
+
         take: 10,
 
         select: {
@@ -95,21 +99,27 @@ export default async function GroupPage({
     notFound();
   }
 
-  const membership = group.members[0] ?? null;
+  const membership =
+    group.members[0] ?? null;
 
   const isMember = Boolean(membership);
 
   const isAdmin =
     membership?.role === "ADMIN";
 
+  const isCreator =
+    currentUser.id === group.creator.id;
+
   const groupMembers = isMember
     ? await db.groupMember.findMany({
         where: {
           groupId: group.id,
         },
+
         orderBy: {
           joinedAt: "asc",
         },
+
         select: {
           role: true,
           joinedAt: true,
@@ -128,9 +138,12 @@ export default async function GroupPage({
     : [];
 
   const formattedDate =
-    new Intl.DateTimeFormat("en-US", {
-      dateStyle: "medium",
-    }).format(group.createdAt);
+    new Intl.DateTimeFormat(
+      "en-US",
+      {
+        dateStyle: "medium",
+      },
+    ).format(group.createdAt);
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -210,7 +223,8 @@ export default async function GroupPage({
                     </h1>
 
                     <span className="rounded-full bg-white/5 px-2 py-1 text-xs text-slate-400">
-                      {group.privacy === "PUBLIC"
+                      {group.privacy ===
+                      "PUBLIC"
                         ? "Public"
                         : "Private"}
                     </span>
@@ -222,12 +236,21 @@ export default async function GroupPage({
                 </div>
               </div>
 
-              {/* Membership */}
-              <GroupMembershipButton
-                groupId={group.id}
-                isMember={isMember}
-                isAdmin={isAdmin}
-              />
+              {/* Membership + Report */}
+              <div className="flex flex-wrap items-center gap-2">
+                <GroupMembershipButton
+                  groupId={group.id}
+                  isMember={isMember}
+                  isAdmin={isAdmin}
+                />
+
+                {!isCreator && (
+                  <ReportButton
+                    targetType="GROUP"
+                    targetId={group.id}
+                  />
+                )}
+              </div>
             </div>
 
             {/* Description */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   updatePrivacySettingsAction,
@@ -16,36 +16,102 @@ export function PrivacyForm({
 }: PrivacyFormProps) {
   const router = useRouter();
 
-  const [form, setForm] = useState(initialData);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [form, setForm] =
+    useState<PrivacySettingsInput>(
+      initialData,
+    );
+
+  const [savedForm, setSavedForm] =
+    useState<PrivacySettingsInput>(
+      initialData,
+    );
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const [message, setMessage] =
+    useState("");
+
+  const hasChanges = useMemo(() => {
+    return (
+      form.profileVisibility !==
+        savedForm.profileVisibility ||
+      form.allowFriendRequests !==
+        savedForm.allowFriendRequests ||
+      form.allowMessages !==
+        savedForm.allowMessages
+    );
+  }, [form, savedForm]);
+
+  function updateForm(
+    changes: Partial<PrivacySettingsInput>,
+  ) {
+    setForm((current) => ({
+      ...current,
+      ...changes,
+    }));
+
+    setError("");
+    setMessage("");
+  }
+
+  function handleReset() {
+    if (saving) {
+      return;
+    }
+
+    setForm(savedForm);
+    setError("");
+    setMessage("");
+  }
 
   async function handleSubmit(
-    event: React.FormEvent,
+    event: React.FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
+
+    if (saving) {
+      return;
+    }
 
     setSaving(true);
     setError("");
     setMessage("");
 
-    const result =
-      await updatePrivacySettingsAction(form);
+    try {
+      const result =
+        await updatePrivacySettingsAction(
+          form,
+        );
 
-    setSaving(false);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
 
-    if (!result.success) {
-      setError(result.error);
-      return;
+      setSavedForm(form);
+
+      setMessage(
+        result.message ??
+          "Privacy settings updated successfully.",
+      );
+
+      router.refresh();
+    } catch (error) {
+      console.error(
+        "PrivacyForm submit failed:",
+        error,
+      );
+
+      setError(
+        "Failed to update privacy settings. Please try again.",
+      );
+    } finally {
+      setSaving(false);
     }
-
-    setMessage(
-      result.message ??
-        "Privacy settings updated successfully.",
-    );
-
-    router.refresh();
   }
 
   return (
@@ -54,13 +120,19 @@ export function PrivacyForm({
       className="space-y-6"
     >
       {error && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <div
+          role="alert"
+          className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+        >
           {error}
         </div>
       )}
 
       {message && (
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+        <div
+          role="status"
+          className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"
+        >
           {message}
         </div>
       )}
@@ -78,11 +150,11 @@ export function PrivacyForm({
           id="profileVisibility"
           value={form.profileVisibility}
           onChange={(event) =>
-            setForm((current) => ({
-              ...current,
+            updateForm({
               profileVisibility:
-                event.target.value as PrivacySettingsInput["profileVisibility"],
-            }))
+                event.target
+                  .value as PrivacySettingsInput["profileVisibility"],
+            })
           }
           disabled={saving}
           className="w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
@@ -100,11 +172,12 @@ export function PrivacyForm({
           </option>
         </select>
 
-        <p className="mt-2 text-xs text-slate-500">
-          Public: anyone can view your profile.
-          Friends Only: only accepted friends can view
-          your profile. Private: your profile is hidden
-          from other users.
+        <p className="mt-2 text-xs leading-5 text-slate-500">
+          Public: anyone can view your
+          profile. Friends Only: only
+          accepted friends can view your
+          profile. Private: your profile is
+          hidden from other users.
         </p>
       </div>
 
@@ -116,24 +189,24 @@ export function PrivacyForm({
               Friend Requests
             </h2>
 
-            <p className="mt-1 text-sm text-slate-400">
-              Allow other users to send you friend
-              requests.
+            <p className="mt-1 text-sm leading-5 text-slate-400">
+              Allow other users to send you
+              friend requests.
             </p>
           </div>
 
           <button
             type="button"
             role="switch"
+            aria-label="Allow friend requests"
             aria-checked={
               form.allowFriendRequests
             }
             onClick={() =>
-              setForm((current) => ({
-                ...current,
+              updateForm({
                 allowFriendRequests:
-                  !current.allowFriendRequests,
-              }))
+                  !form.allowFriendRequests,
+              })
             }
             disabled={saving}
             className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -143,6 +216,7 @@ export function PrivacyForm({
             }`}
           >
             <span
+              aria-hidden="true"
               className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
                 form.allowFriendRequests
                   ? "left-6"
@@ -150,6 +224,20 @@ export function PrivacyForm({
               }`}
             />
           </button>
+        </div>
+
+        <div className="mt-3">
+          <span
+            className={`text-xs font-medium ${
+              form.allowFriendRequests
+                ? "text-blue-400"
+                : "text-slate-500"
+            }`}
+          >
+            {form.allowFriendRequests
+              ? "Allowed"
+              : "Not allowed"}
+          </span>
         </div>
       </div>
 
@@ -161,21 +249,24 @@ export function PrivacyForm({
               Messages
             </h2>
 
-            <p className="mt-1 text-sm text-slate-400">
-              Allow other users to send you messages.
+            <p className="mt-1 text-sm leading-5 text-slate-400">
+              Allow other users to send you
+              messages.
             </p>
           </div>
 
           <button
             type="button"
             role="switch"
-            aria-checked={form.allowMessages}
+            aria-label="Allow messages"
+            aria-checked={
+              form.allowMessages
+            }
             onClick={() =>
-              setForm((current) => ({
-                ...current,
+              updateForm({
                 allowMessages:
-                  !current.allowMessages,
-              }))
+                  !form.allowMessages,
+              })
             }
             disabled={saving}
             className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -185,6 +276,7 @@ export function PrivacyForm({
             }`}
           >
             <span
+              aria-hidden="true"
               className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
                 form.allowMessages
                   ? "left-6"
@@ -193,18 +285,45 @@ export function PrivacyForm({
             />
           </button>
         </div>
+
+        <div className="mt-3">
+          <span
+            className={`text-xs font-medium ${
+              form.allowMessages
+                ? "text-blue-400"
+                : "text-slate-500"
+            }`}
+          >
+            {form.allowMessages
+              ? "Allowed"
+              : "Not allowed"}
+          </span>
+        </div>
       </div>
 
       {/* Save */}
-      <div className="border-t border-white/10 pt-6">
+      <div className="flex flex-col-reverse gap-3 border-t border-white/10 pt-6 sm:flex-row sm:justify-end">
+        {hasChanges && (
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={saving}
+            className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Reset Changes
+          </button>
+        )}
+
         <button
           type="submit"
-          disabled={saving}
-          className="w-full rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={saving || !hasChanges}
+          className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving
             ? "Saving..."
-            : "Save Privacy Settings"}
+            : hasChanges
+              ? "Save Privacy Settings"
+              : "No Changes"}
         </button>
       </div>
     </form>
