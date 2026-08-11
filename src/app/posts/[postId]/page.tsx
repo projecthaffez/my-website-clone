@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { PostCard } from "@/components/posts/PostCard";
 import { CommentForm } from "@/components/posts/CommentForm";
 import { ReplyButton } from "@/components/posts/ReplyButton";
+import { DeleteCommentButton } from "@/components/posts/DeleteCommentButton";
 
 interface PostDetailPageProps {
   params: Promise<{
@@ -83,6 +84,7 @@ export default async function PostDetailPage({
         },
         select: {
           id: true,
+          authorId: true,
           content: true,
           createdAt: true,
 
@@ -104,6 +106,7 @@ export default async function PostDetailPage({
             },
             select: {
               id: true,
+              authorId: true,
               content: true,
               createdAt: true,
 
@@ -264,17 +267,21 @@ export default async function PostDetailPage({
                           </p>
                         </div>
 
-                        <div className="mt-2 flex items-center gap-3 px-2">
+                        <div className="mt-2 flex flex-wrap items-center gap-3 px-2">
                           <time className="text-[11px] text-slate-600">
-                            {formatCommentDate(
-                              comment.createdAt,
-                            )}
+                            {formatCommentDate(comment.createdAt)}
                           </time>
 
                           <ReplyButton
                             postId={post.id}
                             commentId={comment.id}
                           />
+
+                          {comment.authorId === currentUser.id && (
+                            <DeleteCommentButton
+                              commentId={comment.id}
+                            />
+                          )}
                         </div>
 
                         {comment.replies.length > 0 && (
@@ -290,12 +297,8 @@ export default async function PostDetailPage({
                                 >
                                   {reply.author.avatarUrl ? (
                                     <img
-                                      src={
-                                        reply.author.avatarUrl
-                                      }
-                                      alt={
-                                        reply.author.name
-                                      }
+                                      src={reply.author.avatarUrl}
+                                      alt={reply.author.name}
                                       className="h-full w-full object-cover"
                                     />
                                   ) : (
@@ -333,11 +336,20 @@ export default async function PostDetailPage({
                                     </p>
                                   </div>
 
-                                  <time className="mt-2 block px-2 text-[11px] text-slate-600">
-                                    {formatCommentDate(
-                                      reply.createdAt,
+                                  <div className="mt-2 flex flex-wrap items-center gap-3 px-2">
+                                    <time className="text-[11px] text-slate-600">
+                                      {formatCommentDate(
+                                        reply.createdAt,
+                                      )}
+                                    </time>
+
+                                    {reply.authorId ===
+                                      currentUser.id && (
+                                      <DeleteCommentButton
+                                        commentId={reply.id}
+                                      />
                                     )}
-                                  </time>
+                                  </div>
                                 </div>
                               </div>
                             ))}
