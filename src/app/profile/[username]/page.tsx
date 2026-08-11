@@ -13,6 +13,9 @@ interface ProfilePageProps {
   params: Promise<{
     username: string;
   }>;
+  searchParams: Promise<{
+    tab?: string;
+  }>;
 }
 
 type RelationshipState =
@@ -23,14 +26,22 @@ type RelationshipState =
 
 export default async function ProfilePage({
   params,
+  searchParams,
 }: ProfilePageProps) {
   const { username } = await params;
+  const { tab } = await searchParams;
+
+  const activeTab =
+    tab === "about" ||
+    tab === "photos" ||
+    tab === "friends"
+      ? tab
+      : "posts";
 
   const profile = await db.user.findUnique({
     where: {
       username: username.toLowerCase(),
     },
-
     select: {
       id: true,
       username: true,
@@ -48,11 +59,6 @@ export default async function ProfilePage({
         select: {
           followers: true,
           following: true,
-          sentFriendRequests: {
-            where: {
-              status: "ACCEPTED",
-            },
-          },
         },
       },
     },
@@ -62,8 +68,7 @@ export default async function ProfilePage({
     notFound();
   }
 
-  const currentUser =
-    await getCurrentUser();
+  const currentUser = await getCurrentUser();
 
   const isOwnProfile =
     currentUser?.id === profile.id;
@@ -93,7 +98,6 @@ export default async function ProfilePage({
             followingId: profile.id,
           },
         },
-
         select: {
           followerId: true,
         },
@@ -112,7 +116,6 @@ export default async function ProfilePage({
             },
           ],
         },
-
         select: {
           id: true,
           requesterId: true,
@@ -124,7 +127,6 @@ export default async function ProfilePage({
       db.friendship.findFirst({
         where: {
           status: "BLOCKED",
-
           OR: [
             {
               requesterId: currentUser.id,
@@ -136,7 +138,6 @@ export default async function ProfilePage({
             },
           ],
         },
-
         select: {
           id: true,
           requesterId: true,
@@ -146,19 +147,16 @@ export default async function ProfilePage({
     ]);
 
     isFollowing = Boolean(follow);
-    isBlocked =
-      Boolean(blockedRelationship);
+    isBlocked = Boolean(blockedRelationship);
 
     if (
       friendship &&
       friendship.status !== "BLOCKED"
     ) {
-      friendshipRequestId =
-        friendship.id;
+      friendshipRequestId = friendship.id;
 
       if (
-        friendship.status ===
-        "ACCEPTED"
+        friendship.status === "ACCEPTED"
       ) {
         friendshipState = "ACCEPTED";
         isFriend = true;
@@ -169,8 +167,7 @@ export default async function ProfilePage({
           friendship.requesterId ===
           currentUser.id
         ) {
-          friendshipState =
-            "PENDING_SENT";
+          friendshipState = "PENDING_SENT";
         } else {
           friendshipState =
             "PENDING_RECEIVED";
@@ -183,8 +180,8 @@ export default async function ProfilePage({
    * Profile visibility rules:
    *
    * PUBLIC  -> everyone can view
-   * FRIENDS -> owner and accepted friends can view
-   * PRIVATE -> owner only
+   * FRIENDS -> only friends and the owner
+   * PRIVATE -> only the owner
    */
   const canViewProfile =
     isOwnProfile ||
@@ -200,7 +197,7 @@ export default async function ProfilePage({
         <div className="mx-auto max-w-2xl">
           <div className="rounded-2xl border border-white/10 bg-slate-900 p-8 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/5 text-2xl">
-              ðŸ”’
+              🔒
             </div>
 
             <h1 className="mt-5 text-2xl font-bold">
@@ -231,12 +228,8 @@ export default async function ProfilePage({
                     />
 
                     <BlockButton
-                      targetUserId={
-                        profile.id
-                      }
-                      initialBlocked={
-                        isBlocked
-                      }
+                      targetUserId={profile.id}
+                      initialBlocked={isBlocked}
                     />
                   </>
                 )}
@@ -256,9 +249,21 @@ export default async function ProfilePage({
       },
     ).format(profile.createdAt);
 
-  /*
-   * Load visible posts for this profile.
-   */
+  const friendsCount =
+    await db.friendship.count({
+      where: {
+        status: "ACCEPTED",
+        OR: [
+          {
+            requesterId: profile.id,
+          },
+          {
+            addresseeId: profile.id,
+          },
+        ],
+      },
+    });
+
   const profilePosts =
     await db.post.findMany({
       where: {
@@ -306,17 +311,17 @@ export default async function ProfilePage({
         content: true,
         createdAt: true,
 
-          media: {
-            select: {
-              id: true,
-              url: true,
-              type: true,
-              aspectRatio: true,
-            },
-            orderBy: {
-              createdAt: "asc",
-            },
+        media: {
+          select: {
+            id: true,
+            url: true,
+            type: true,
+            aspectRatio: true,
           },
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
 
         author: {
           select: {
@@ -328,6 +333,110 @@ export default async function ProfilePage({
         },
       },
     });
+
+  const profileFriends =
+    activeTab === "friends"
+      ? await db.friendship.findMany({
+          where: {
+            status: "ACCEPTED",
+            OR: [
+              {
+                requesterId: profile.id,
+              },
+              {
+                addresseeId: profile.id,
+              },
+            ],
+          },
+          orderBy: {
+            id: "desc",
+          },
+          select: {
+            requester: {
+              select: {
+                id: true,
+                username: true,
+                name: true,
+                avatarUrl: true,
+                isVerified: true,
+              },
+            },
+            addressee: {
+              select: {
+                id: true,
+                username: true,
+                name: true,
+                avatarUrl: true,
+                isVerified: true,
+              },
+            },
+          },
+        })
+      : [];
+
+  const profilePhotos =
+    activeTab === "photos"
+      ? await db.post.findMany({
+          where: {
+            authorId: profile.id,
+            isDeleted: false,
+
+            media: {
+              some: {
+                type: "IMAGE",
+              },
+            },
+
+            OR: [
+              {
+                visibility: "PUBLIC",
+              },
+
+              ...(isOwnProfile || isFriend
+                ? [
+                    {
+                      visibility:
+                        "FRIENDS" as const,
+                    },
+                  ]
+                : []),
+
+              ...(isOwnProfile
+                ? [
+                    {
+                      visibility:
+                        "PRIVATE" as const,
+                    },
+                  ]
+                : []),
+            ],
+          },
+
+          orderBy: {
+            createdAt: "desc",
+          },
+
+          take: 50,
+
+          select: {
+            id: true,
+
+            media: {
+              where: {
+                type: "IMAGE",
+              },
+              orderBy: {
+                createdAt: "asc",
+              },
+              select: {
+                id: true,
+                url: true,
+                type: true,
+              },
+            },
+          },
+        })
+      : [];
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -399,18 +508,14 @@ export default async function ProfilePage({
                     {!isBlocked && (
                       <>
                         <FollowButton
-                          targetUserId={
-                            profile.id
-                          }
+                          targetUserId={profile.id}
                           initialFollowing={
                             isFollowing
                           }
                         />
 
                         <FriendRequestButton
-                          targetUserId={
-                            profile.id
-                          }
+                          targetUserId={profile.id}
                           initialState={
                             friendshipState
                           }
@@ -420,9 +525,7 @@ export default async function ProfilePage({
                         />
 
                         <MessageButton
-                          targetUserId={
-                            profile.id
-                          }
+                          targetUserId={profile.id}
                         />
                       </>
                     )}
@@ -433,12 +536,8 @@ export default async function ProfilePage({
                     />
 
                     <BlockButton
-                      targetUserId={
-                        profile.id
-                      }
-                      initialBlocked={
-                        isBlocked
-                      }
+                      targetUserId={profile.id}
+                      initialBlocked={isBlocked}
                     />
                   </>
                 ) : (
@@ -474,7 +573,7 @@ export default async function ProfilePage({
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-400">
               {profile.location && (
                 <span>
-                  ðŸ“ {profile.location}
+                  📍 {profile.location}
                 </span>
               )}
 
@@ -485,7 +584,7 @@ export default async function ProfilePage({
                   rel="noopener noreferrer"
                   className="text-blue-400 hover:underline"
                 >
-                  ðŸ”— Website
+                  🔗 Website
                 </a>
               )}
 
@@ -496,68 +595,88 @@ export default async function ProfilePage({
 
             {/* Stats */}
             <div className="mt-6 flex flex-wrap gap-6 border-t border-white/10 pt-5">
-              <div>
-                <strong className="text-lg">
-                  {profile._count
-                    .followers}
+              <Link
+                href={`/followers/${profile.username}`}
+                className="group"
+              >
+                <strong className="text-lg group-hover:text-blue-400">
+                  {profile._count.followers}
                 </strong>
 
-                <span className="ml-2 text-sm text-slate-400">
+                <span className="ml-2 text-sm text-slate-400 group-hover:text-white">
                   Followers
                 </span>
-              </div>
+              </Link>
 
-              <div>
-                <strong className="text-lg">
-                  {profile._count
-                    .following}
+              <Link
+                href={`/following/${profile.username}`}
+                className="group"
+              >
+                <strong className="text-lg group-hover:text-blue-400">
+                  {profile._count.following}
                 </strong>
 
-                <span className="ml-2 text-sm text-slate-400">
+                <span className="ml-2 text-sm text-slate-400 group-hover:text-white">
                   Following
                 </span>
-              </div>
+              </Link>
 
-              <div>
-                <strong className="text-lg">
-                  {
-                    profile._count
-                      .sentFriendRequests
-                  }
+              <Link
+                href={`/profile/${profile.username}?tab=friends`}
+                className="group"
+              >
+                <strong className="text-lg group-hover:text-blue-400">
+                  {friendsCount}
                 </strong>
 
-                <span className="ml-2 text-sm text-slate-400">
+                <span className="ml-2 text-sm text-slate-400 group-hover:text-white">
                   Friends
                 </span>
-              </div>
+              </Link>
             </div>
 
             {/* Profile Navigation */}
             <nav className="mt-6 flex overflow-x-auto border-t border-white/10">
               <Link
                 href={`/profile/${profile.username}`}
-                className="border-b-2 border-blue-500 px-6 py-4 text-sm font-semibold text-white"
+                className={
+                  activeTab === "posts"
+                    ? "border-b-2 border-blue-500 px-6 py-4 text-sm font-semibold text-white"
+                    : "px-6 py-4 text-sm text-slate-400 hover:text-white"
+                }
               >
                 Posts
               </Link>
 
               <Link
                 href={`/profile/${profile.username}?tab=about`}
-                className="px-6 py-4 text-sm text-slate-400 hover:text-white"
+                className={
+                  activeTab === "about"
+                    ? "border-b-2 border-blue-500 px-6 py-4 text-sm font-semibold text-white"
+                    : "px-6 py-4 text-sm text-slate-400 hover:text-white"
+                }
               >
                 About
               </Link>
 
               <Link
                 href={`/profile/${profile.username}?tab=photos`}
-                className="px-6 py-4 text-sm text-slate-400 hover:text-white"
+                className={
+                  activeTab === "photos"
+                    ? "border-b-2 border-blue-500 px-6 py-4 text-sm font-semibold text-white"
+                    : "px-6 py-4 text-sm text-slate-400 hover:text-white"
+                }
               >
                 Photos
               </Link>
 
               <Link
                 href={`/profile/${profile.username}?tab=friends`}
-                className="px-6 py-4 text-sm text-slate-400 hover:text-white"
+                className={
+                  activeTab === "friends"
+                    ? "border-b-2 border-blue-500 px-6 py-4 text-sm font-semibold text-white"
+                    : "px-6 py-4 text-sm text-slate-400 hover:text-white"
+                }
               >
                 Friends
               </Link>
@@ -565,50 +684,237 @@ export default async function ProfilePage({
           </div>
         </div>
 
-        {/* Profile Posts */}
-        <section className="mt-6 space-y-4">
-          <div>
-            <h2 className="text-xl font-bold">
-              {isOwnProfile
-                ? "Your Posts"
-                : `${profile.name}'s Posts`}
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              {isOwnProfile
-                ? "Your latest posts."
-                : `Latest posts shared by ${profile.name}.`}
-            </p>
-          </div>
-
-          {profilePosts.length ===
-          0 ? (
-            <div className="rounded-2xl border border-white/10 bg-slate-900 p-10 text-center">
-              <div className="text-4xl">
-                ðŸ“
-              </div>
-
-              <h3 className="mt-4 text-lg font-semibold">
-                No posts yet
-              </h3>
-
-              <p className="mt-2 text-sm text-slate-400">
+        {/* Posts */}
+        {activeTab === "posts" && (
+          <section className="mt-6 space-y-4">
+            <div>
+              <h2 className="text-xl font-bold">
                 {isOwnProfile
-                  ? "You have not shared any posts yet."
-                  : "This user has not shared any visible posts yet."}
+                  ? "Your Posts"
+                  : `${profile.name}'s Posts`}
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                {isOwnProfile
+                  ? "Your latest posts."
+                  : `Latest posts shared by ${profile.name}.`}
               </p>
             </div>
-          ) : (
-            profilePosts.map(
-              (post) => (
+
+            {profilePosts.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-slate-900 p-10 text-center">
+                <h3 className="text-lg font-semibold">
+                  No posts yet
+                </h3>
+
+                <p className="mt-2 text-sm text-slate-400">
+                  {isOwnProfile
+                    ? "You have not shared any posts yet."
+                    : "This user has not shared any visible posts yet."}
+                </p>
+              </div>
+            ) : (
+              profilePosts.map((post) => (
                 <PostCard
                   key={post.id}
                   post={post}
                 />
-              ),
-            )
-          )}
-        </section>
+              ))
+            )}
+          </section>
+        )}
+
+        {/* About */}
+        {activeTab === "about" && (
+          <section className="mt-6 rounded-2xl border border-white/10 bg-slate-900 p-6">
+            <h2 className="text-xl font-bold">
+              About {profile.name}
+            </h2>
+
+            <div className="mt-6 space-y-5">
+              {profile.bio && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Bio
+                  </p>
+
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">
+                    {profile.bio}
+                  </p>
+                </div>
+              )}
+
+              {profile.location && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Location
+                  </p>
+
+                  <p className="mt-2 text-sm text-slate-300">
+                    {profile.location}
+                  </p>
+                </div>
+              )}
+
+              {profile.website && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Website
+                  </p>
+
+                  <a
+                    href={profile.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-block break-all text-sm text-blue-400 hover:underline"
+                  >
+                    {profile.website}
+                  </a>
+                </div>
+              )}
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Member Since
+                </p>
+
+                <p className="mt-2 text-sm text-slate-300">
+                  {memberSince}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Photos */}
+        {activeTab === "photos" && (
+          <section className="mt-6">
+            <div className="mb-4">
+              <h2 className="text-xl font-bold">
+                Photos
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Photos shared by {profile.name}.
+              </p>
+            </div>
+
+            {profilePhotos.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-slate-900 p-10 text-center">
+                <h3 className="text-lg font-semibold">
+                  No photos yet
+                </h3>
+
+                <p className="mt-2 text-sm text-slate-400">
+                  No visible photos have been shared.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {profilePhotos.flatMap(
+                  (post) =>
+                    post.media.map((media) => (
+                      <Link
+                        key={media.id}
+                        href={`/posts/${post.id}`}
+                        className="group aspect-square overflow-hidden rounded-2xl border border-white/10 bg-slate-900"
+                      >
+                        <img
+                          src={media.url}
+                          alt="Profile photo"
+                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                        />
+                      </Link>
+                    )),
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Friends */}
+        {activeTab === "friends" && (
+          <section className="mt-6">
+            <div className="mb-4">
+              <h2 className="text-xl font-bold">
+                {profile.name}'s Friends
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                {friendsCount}{" "}
+                {friendsCount === 1
+                  ? "friend"
+                  : "friends"}
+              </p>
+            </div>
+
+            {profileFriends.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-slate-900 p-10 text-center">
+                <h3 className="text-lg font-semibold">
+                  No friends yet
+                </h3>
+
+                <p className="mt-2 text-sm text-slate-400">
+                  {profile.name} has no accepted friends to display.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {profileFriends.map(
+                  (friendship) => {
+                    const friend =
+                      friendship.requester.id ===
+                      profile.id
+                        ? friendship.addressee
+                        : friendship.requester;
+
+                    return (
+                      <Link
+                        key={friend.id}
+                        href={`/profile/${friend.username}`}
+                        className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900 p-4 transition hover:bg-white/5"
+                      >
+                        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-slate-800">
+                          {friend.avatarUrl ? (
+                            <img
+                              src={friend.avatarUrl}
+                              alt={friend.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-lg font-bold text-slate-400">
+                              {friend.name
+                                .charAt(0)
+                                .toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="truncate font-semibold text-white">
+                              {friend.name}
+                            </p>
+
+                            {friend.isVerified && (
+                              <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                                ✓
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="truncate text-sm text-slate-500">
+                            @{friend.username}
+                          </p>
+                        </div>
+                      </Link>
+                    );
+                  },
+                )}
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </main>
   );
