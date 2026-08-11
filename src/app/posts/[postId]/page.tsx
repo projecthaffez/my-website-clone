@@ -7,6 +7,7 @@ import { CommentForm } from "@/components/posts/CommentForm";
 import { ReplyButton } from "@/components/posts/ReplyButton";
 import { DeleteCommentButton } from "@/components/posts/DeleteCommentButton";
 import { CommentLikeButton } from "@/components/posts/CommentLikeButton";
+import { EditCommentButton } from "@/components/posts/EditCommentButton";
 
 interface PostDetailPageProps {
   params: Promise<{
@@ -313,9 +314,16 @@ export default async function PostDetailPage({
 
                             {comment.authorId ===
                               currentUser.id && (
-                              <DeleteCommentButton
-                                commentId={comment.id}
-                              />
+                              <>
+                                <EditCommentButton
+                                  commentId={comment.id}
+                                  initialContent={comment.content}
+                                />
+
+                                <DeleteCommentButton
+                                  commentId={comment.id}
+                                />
+                              </>
                             )}
                           </div>
 
@@ -417,11 +425,22 @@ export default async function PostDetailPage({
 
                                           {reply.authorId ===
                                             currentUser.id && (
-                                            <DeleteCommentButton
-                                              commentId={
-                                                reply.id
-                                              }
-                                            />
+                                            <>
+                                              <EditCommentButton
+                                                commentId={
+                                                  reply.id
+                                                }
+                                                initialContent={
+                                                  reply.content
+                                                }
+                                              />
+
+                                              <DeleteCommentButton
+                                                commentId={
+                                                  reply.id
+                                                }
+                                              />
+                                            </>
                                           )}
                                         </div>
                                       </div>
