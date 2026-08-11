@@ -26,6 +26,11 @@ export async function togglePostLikeAction(
         id: true,
         authorId: true,
         isDeleted: true,
+        group: {
+          select: {
+            slug: true,
+          },
+        },
       },
     });
 
@@ -62,6 +67,12 @@ export async function togglePostLikeAction(
         `/profile/${currentUser.username}`,
       );
 
+      if (post.group?.slug) {
+        revalidatePath(
+          `/groups/${post.group.slug}`,
+        );
+      }
+
       return {
         success: true as const,
         liked: false,
@@ -78,7 +89,7 @@ export async function togglePostLikeAction(
     });
 
     /*
-     * Do not create a notification for your own post.
+     * Do not notify users about their own posts.
      */
     if (post.authorId !== currentUser.id) {
       await db.notification.create({
@@ -87,7 +98,9 @@ export async function togglePostLikeAction(
           actorId: currentUser.id,
           type: "LIKE",
           targetId: postId,
-          targetUrl: "/",
+          targetUrl: post.group?.slug
+            ? `/groups/${post.group.slug}`
+            : "/",
         },
       });
     }
@@ -96,6 +109,12 @@ export async function togglePostLikeAction(
     revalidatePath(
       `/profile/${currentUser.username}`,
     );
+
+    if (post.group?.slug) {
+      revalidatePath(
+        `/groups/${post.group.slug}`,
+      );
+    }
 
     return {
       success: true as const,
@@ -111,7 +130,8 @@ export async function togglePostLikeAction(
     return {
       success: false as const,
       liked: false,
-      error: "Failed to update post reaction.",
+      error:
+        "Failed to update post reaction.",
     };
   }
 }
