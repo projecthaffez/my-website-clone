@@ -6,6 +6,7 @@ import { PostCard } from "@/components/posts/PostCard";
 import { CommentForm } from "@/components/posts/CommentForm";
 import { ReplyButton } from "@/components/posts/ReplyButton";
 import { DeleteCommentButton } from "@/components/posts/DeleteCommentButton";
+import { CommentLikeButton } from "@/components/posts/CommentLikeButton";
 
 interface PostDetailPageProps {
   params: Promise<{
@@ -97,6 +98,13 @@ export default async function PostDetailPage({
             },
           },
 
+          reactions: {
+            select: {
+              id: true,
+              userId: true,
+            },
+          },
+
           replies: {
             where: {
               isDeleted: false,
@@ -116,6 +124,13 @@ export default async function PostDetailPage({
                   name: true,
                   avatarUrl: true,
                   isVerified: true,
+                },
+              },
+
+              reactions: {
+                select: {
+                  id: true,
+                  userId: true,
                 },
               },
             },
@@ -218,147 +233,209 @@ export default async function PostDetailPage({
               </div>
             ) : (
               <div className="divide-y divide-white/5">
-                {post.comments.map((comment) => (
-                  <div
-                    key={comment.id}
-                    className="px-5 py-5"
-                  >
-                    <div className="flex gap-3">
-                      <Link
-                        href={`/profile/${comment.author.username}`}
-                        className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-slate-800"
-                      >
-                        {comment.author.avatarUrl ? (
-                          <img
-                            src={comment.author.avatarUrl}
-                            alt={comment.author.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xs font-bold text-slate-400">
-                            {getInitial(comment.author.name)}
-                          </div>
-                        )}
-                      </Link>
+                {post.comments.map((comment) => {
+                  const commentLiked =
+                    comment.reactions.some(
+                      (reaction) =>
+                        reaction.userId === currentUser.id,
+                    );
 
-                      <div className="min-w-0 flex-1">
-                        <div className="rounded-2xl bg-slate-950 px-4 py-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Link
-                              href={`/profile/${comment.author.username}`}
-                              className="text-sm font-semibold text-slate-200 hover:text-blue-400"
-                            >
-                              {comment.author.name}
-                            </Link>
+                  return (
+                    <div
+                      key={comment.id}
+                      className="px-5 py-5"
+                    >
+                      <div className="flex gap-3">
+                        <Link
+                          href={`/profile/${comment.author.username}`}
+                          className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-slate-800"
+                        >
+                          {comment.author.avatarUrl ? (
+                            <img
+                              src={comment.author.avatarUrl}
+                              alt={comment.author.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-xs font-bold text-slate-400">
+                              {getInitial(
+                                comment.author.name,
+                              )}
+                            </div>
+                          )}
+                        </Link>
 
-                            {comment.author.isVerified && (
-                              <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                                ✓
+                        <div className="min-w-0 flex-1">
+                          <div className="rounded-2xl bg-slate-950 px-4 py-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Link
+                                href={`/profile/${comment.author.username}`}
+                                className="text-sm font-semibold text-slate-200 hover:text-blue-400"
+                              >
+                                {comment.author.name}
+                              </Link>
+
+                              {comment.author.isVerified && (
+                                <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                                  ✓
+                                </span>
+                              )}
+
+                              <span className="text-[11px] text-slate-600">
+                                @{comment.author.username}
                               </span>
-                            )}
+                            </div>
 
-                            <span className="text-[11px] text-slate-600">
-                              @{comment.author.username}
-                            </span>
+                            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
+                              {comment.content}
+                            </p>
                           </div>
 
-                          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
-                            {comment.content}
-                          </p>
-                        </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-3 px-2">
+                            <time className="text-[11px] text-slate-600">
+                              {formatCommentDate(
+                                comment.createdAt,
+                              )}
+                            </time>
 
-                        <div className="mt-2 flex flex-wrap items-center gap-3 px-2">
-                          <time className="text-[11px] text-slate-600">
-                            {formatCommentDate(comment.createdAt)}
-                          </time>
+                            <CommentLikeButton
+                              commentId={comment.id}
+                              initialLiked={commentLiked}
+                              initialCount={
+                                comment.reactions.length
+                              }
+                            />
 
-                          <ReplyButton
-                            postId={post.id}
-                            commentId={comment.id}
-                          />
-
-                          {comment.authorId === currentUser.id && (
-                            <DeleteCommentButton
+                            <ReplyButton
+                              postId={post.id}
                               commentId={comment.id}
                             />
-                          )}
-                        </div>
 
-                        {comment.replies.length > 0 && (
-                          <div className="mt-4 ml-5 space-y-3 border-l border-white/10 pl-4">
-                            {comment.replies.map((reply) => (
-                              <div
-                                key={reply.id}
-                                className="flex gap-3"
-                              >
-                                <Link
-                                  href={`/profile/${reply.author.username}`}
-                                  className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-slate-800"
-                                >
-                                  {reply.author.avatarUrl ? (
-                                    <img
-                                      src={reply.author.avatarUrl}
-                                      alt={reply.author.name}
-                                      className="h-full w-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-slate-400">
-                                      {getInitial(
-                                        reply.author.name,
-                                      )}
-                                    </div>
-                                  )}
-                                </Link>
+                            {comment.authorId ===
+                              currentUser.id && (
+                              <DeleteCommentButton
+                                commentId={comment.id}
+                              />
+                            )}
+                          </div>
 
-                                <div className="min-w-0 flex-1">
-                                  <div className="rounded-2xl bg-slate-950 px-4 py-3">
-                                    <div className="flex flex-wrap items-center gap-2">
+                          {comment.replies.length > 0 && (
+                            <div className="mt-4 ml-5 space-y-3 border-l border-white/10 pl-4">
+                              {comment.replies.map(
+                                (reply) => {
+                                  const replyLiked =
+                                    reply.reactions.some(
+                                      (reaction) =>
+                                        reaction.userId ===
+                                        currentUser.id,
+                                    );
+
+                                  return (
+                                    <div
+                                      key={reply.id}
+                                      className="flex gap-3"
+                                    >
                                       <Link
                                         href={`/profile/${reply.author.username}`}
-                                        className="text-sm font-semibold text-slate-200 hover:text-blue-400"
+                                        className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-slate-800"
                                       >
-                                        {reply.author.name}
+                                        {reply.author
+                                          .avatarUrl ? (
+                                          <img
+                                            src={
+                                              reply.author
+                                                .avatarUrl
+                                            }
+                                            alt={
+                                              reply.author.name
+                                            }
+                                            className="h-full w-full object-cover"
+                                          />
+                                        ) : (
+                                          <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-slate-400">
+                                            {getInitial(
+                                              reply.author
+                                                .name,
+                                            )}
+                                          </div>
+                                        )}
                                       </Link>
 
-                                      {reply.author.isVerified && (
-                                        <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                                          ✓
-                                        </span>
-                                      )}
+                                      <div className="min-w-0 flex-1">
+                                        <div className="rounded-2xl bg-slate-950 px-4 py-3">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <Link
+                                              href={`/profile/${reply.author.username}`}
+                                              className="text-sm font-semibold text-slate-200 hover:text-blue-400"
+                                            >
+                                              {
+                                                reply.author
+                                                  .name
+                                              }
+                                            </Link>
 
-                                      <span className="text-[11px] text-slate-600">
-                                        @{reply.author.username}
-                                      </span>
+                                            {reply.author
+                                              .isVerified && (
+                                              <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                                                ✓
+                                              </span>
+                                            )}
+
+                                            <span className="text-[11px] text-slate-600">
+                                              @
+                                              {
+                                                reply.author
+                                                  .username
+                                              }
+                                            </span>
+                                          </div>
+
+                                          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
+                                            {reply.content}
+                                          </p>
+                                        </div>
+
+                                        <div className="mt-2 flex flex-wrap items-center gap-3 px-2">
+                                          <time className="text-[11px] text-slate-600">
+                                            {formatCommentDate(
+                                              reply.createdAt,
+                                            )}
+                                          </time>
+
+                                          <CommentLikeButton
+                                            commentId={
+                                              reply.id
+                                            }
+                                            initialLiked={
+                                              replyLiked
+                                            }
+                                            initialCount={
+                                              reply.reactions
+                                                .length
+                                            }
+                                          />
+
+                                          {reply.authorId ===
+                                            currentUser.id && (
+                                            <DeleteCommentButton
+                                              commentId={
+                                                reply.id
+                                              }
+                                            />
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
-
-                                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
-                                      {reply.content}
-                                    </p>
-                                  </div>
-
-                                  <div className="mt-2 flex flex-wrap items-center gap-3 px-2">
-                                    <time className="text-[11px] text-slate-600">
-                                      {formatCommentDate(
-                                        reply.createdAt,
-                                      )}
-                                    </time>
-
-                                    {reply.authorId ===
-                                      currentUser.id && (
-                                      <DeleteCommentButton
-                                        commentId={reply.id}
-                                      />
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                                  );
+                                },
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
