@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { ChatForm } from "./ChatForm";
 import { MarkAsRead } from "./MarkAsRead";
 import { DeleteMessageButton } from "./DeleteMessageButton";
+import { EditMessageButton } from "./EditMessageButton";
 
 interface ConversationPageProps {
   params: Promise<{
@@ -229,9 +230,16 @@ export default async function ConversationPage({
                     </div>
 
                     {isMine && (
-                      <DeleteMessageButton
-                        messageId={message.id}
-                      />
+                      <div className="flex items-center gap-1">
+                        <EditMessageButton
+                          messageId={message.id}
+                          initialContent={message.content}
+                        />
+
+                        <DeleteMessageButton
+                          messageId={message.id}
+                        />
+                      </div>
                     )}
                   </div>
                 </div>

@@ -433,6 +433,120 @@ export async function markConversationReadAction(
   }
 }
 
+export async function editMessageAction(
+  messageId: string,
+  content: string,
+) {
+  try {
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      return {
+        success: false as const,
+        error: "You must be logged in.",
+      };
+    }
+
+    if (!messageId) {
+      return {
+        success: false as const,
+        error: "Invalid message.",
+      };
+    }
+
+    const cleanContent = content.trim();
+
+    if (!cleanContent) {
+      return {
+        success: false as const,
+        error: "Message cannot be empty.",
+      };
+    }
+
+    if (cleanContent.length > 5000) {
+      return {
+        success: false as const,
+        error: "Message cannot exceed 5000 characters.",
+      };
+    }
+
+    const message = await db.message.findUnique({
+      where: {
+        id: messageId,
+      },
+      select: {
+        id: true,
+        senderId: true,
+        conversationId: true,
+        isDeleted: true,
+      },
+    });
+
+    if (!message) {
+      return {
+        success: false as const,
+        error: "Message not found.",
+      };
+    }
+
+    if (message.senderId !== currentUser.id) {
+      return {
+        success: false as const,
+        error: "You can only edit your own messages.",
+      };
+    }
+
+    if (message.isDeleted) {
+      return {
+        success: false as const,
+        error: "Deleted messages cannot be edited.",
+      };
+    }
+
+    const access = await getConversationAccess(
+      message.conversationId,
+      currentUser.id,
+    );
+
+    if (!access) {
+      return {
+        success: false as const,
+        error:
+          "You are not a participant in this conversation.",
+      };
+    }
+
+    await db.message.update({
+      where: {
+        id: message.id,
+      },
+      data: {
+        content: cleanContent,
+      },
+    });
+
+    revalidatePath(
+      `/messages/${message.conversationId}`,
+    );
+    revalidatePath("/messages");
+
+    return {
+      success: true as const,
+      message: "Message updated.",
+    };
+  } catch (error) {
+    console.error(
+      "editMessageAction failed:",
+      error,
+    );
+
+    return {
+      success: false as const,
+      error:
+        "Failed to edit message. Please try again.",
+    };
+  }
+}
 export async function deleteMessageAction(
   messageId: string,
 ) {
