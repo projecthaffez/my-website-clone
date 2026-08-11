@@ -192,6 +192,19 @@ export default async function HomePage() {
       content: true,
       createdAt: true,
 
+      media: {
+        select: {
+          id: true,
+          url: true,
+          type: true,
+          aspectRatio: true,
+        },
+
+        orderBy: {
+          createdAt: "asc",
+        },
+      },
+
       author: {
         select: {
           username: true,

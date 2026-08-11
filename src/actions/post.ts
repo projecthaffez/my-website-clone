@@ -4,8 +4,15 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
+export type PostMediaInput = {
+  url: string;
+  type: "IMAGE" | "VIDEO" | "DOCUMENT";
+  aspectRatio?: number | null;
+};
+
 export async function createPostAction(
   content: string,
+  media: PostMediaInput[] = [],
 ) {
   try {
     const currentUser = await getCurrentUser();
@@ -20,10 +27,11 @@ export async function createPostAction(
 
     const cleanContent = content.trim();
 
-    if (!cleanContent) {
+    if (!cleanContent && media.length === 0) {
       return {
         success: false as const,
-        error: "Post cannot be empty.",
+        error:
+          "Write something or attach a file before posting.",
       };
     }
 
@@ -35,12 +43,65 @@ export async function createPostAction(
       };
     }
 
+    if (media.length > 10) {
+      return {
+        success: false as const,
+        error:
+          "You can attach a maximum of 10 files.",
+      };
+    }
+
+    for (const item of media) {
+      if (!item.url || !item.url.startsWith("/uploads/")) {
+        return {
+          success: false as const,
+          error: "Invalid media file.",
+        };
+      }
+
+      if (
+        item.type !== "IMAGE" &&
+        item.type !== "VIDEO" &&
+        item.type !== "DOCUMENT"
+      ) {
+        return {
+          success: false as const,
+          error: "Invalid media type.",
+        };
+      }
+
+      if (
+        item.aspectRatio !== undefined &&
+        item.aspectRatio !== null &&
+        (!Number.isFinite(item.aspectRatio) ||
+          item.aspectRatio <= 0)
+      ) {
+        return {
+          success: false as const,
+          error: "Invalid media aspect ratio.",
+        };
+      }
+    }
+
     const post = await db.post.create({
       data: {
         authorId: currentUser.id,
         content: cleanContent,
         visibility: "PUBLIC",
+
+        media:
+          media.length > 0
+            ? {
+                create: media.map((item) => ({
+                  url: item.url,
+                  type: item.type,
+                  aspectRatio:
+                    item.aspectRatio ?? null,
+                })),
+              }
+            : undefined,
       },
+
       select: {
         id: true,
       },
@@ -53,7 +114,8 @@ export async function createPostAction(
 
     return {
       success: true as const,
-      message: "Post created successfully.",
+      message:
+        "Post created successfully.",
       postId: post.id,
     };
   } catch (error) {
@@ -112,15 +174,11 @@ export async function deletePostAction(
     if (post.isDeleted) {
       return {
         success: false as const,
-        error: "Post has already been deleted.",
+        error:
+          "Post has already been deleted.",
       };
     }
 
-    /*
-     * Soft delete:
-     * Keep the database record so related
-     * reactions/comments remain consistent.
-     */
     await db.post.update({
       where: {
         id: postId,
@@ -137,7 +195,8 @@ export async function deletePostAction(
 
     return {
       success: true as const,
-      message: "Post deleted successfully.",
+      message:
+        "Post deleted successfully.",
     };
   } catch (error) {
     console.error(
@@ -198,11 +257,6 @@ export async function togglePinPostAction(
 
     const nextPinned = !post.isPinned;
 
-    /*
-     * Only one pinned post per user.
-     * If pinning this post, unpin the user's
-     * other pinned posts first.
-     */
     if (nextPinned) {
       await db.post.updateMany({
         where: {

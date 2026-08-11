@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { db } from "@/lib/db";
@@ -89,6 +89,18 @@ export default async function PageProfile({
             id: true,
             content: true,
             createdAt: true,
+
+          media: {
+            select: {
+              id: true,
+              url: true,
+              type: true,
+              aspectRatio: true,
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
 
             author: {
               select: {
@@ -217,7 +229,7 @@ export default async function PageProfile({
 
                     {page.owner.isVerified && (
                       <span className="rounded-full bg-blue-500/10 px-2 py-1 text-xs font-semibold text-blue-400">
-                        ✓ Verified
+                        âœ“ Verified
                       </span>
                     )}
                   </div>
@@ -272,7 +284,7 @@ export default async function PageProfile({
 
             <div className="mt-6 flex flex-wrap gap-5 border-t border-white/10 pt-5 text-sm text-slate-500">
               <span>
-                👥{" "}
+                ðŸ‘¥{" "}
                 <strong className="text-slate-300">
                   {page._count.followers}
                 </strong>{" "}
@@ -282,7 +294,7 @@ export default async function PageProfile({
               </span>
 
               <span>
-                📝{" "}
+                ðŸ“{" "}
                 <strong className="text-slate-300">
                   {page._count.posts}
                 </strong>{" "}
@@ -376,7 +388,7 @@ export default async function PageProfile({
           {page.posts.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-900 p-10 text-center">
               <div className="text-4xl">
-                📝
+                ðŸ“
               </div>
 
               <h3 className="mt-4 text-lg font-semibold">

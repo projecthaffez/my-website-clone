@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -81,6 +81,18 @@ export default async function GroupPage({
           id: true,
           content: true,
           createdAt: true,
+
+          media: {
+            select: {
+              id: true,
+              url: true,
+              type: true,
+              aspectRatio: true,
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
 
           author: {
             select: {
@@ -263,14 +275,14 @@ export default async function GroupPage({
             {/* Stats */}
             <div className="mt-5 flex flex-wrap gap-4 text-sm text-slate-500">
               <span>
-                👥 {group._count.members}{" "}
+                ðŸ‘¥ {group._count.members}{" "}
                 {group._count.members === 1
                   ? "member"
                   : "members"}
               </span>
 
               <span>
-                📝 {group._count.posts}{" "}
+                ðŸ“ {group._count.posts}{" "}
                 {group._count.posts === 1
                   ? "post"
                   : "posts"}
@@ -354,7 +366,7 @@ export default async function GroupPage({
           group.privacy === "PRIVATE" ? (
             <div className="rounded-2xl border border-white/10 bg-slate-900 p-10 text-center">
               <div className="text-4xl">
-                🔒
+                ðŸ”’
               </div>
 
               <h3 className="mt-4 text-lg font-semibold">
@@ -369,7 +381,7 @@ export default async function GroupPage({
           ) : group.posts.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-900 p-10 text-center">
               <div className="text-4xl">
-                📝
+                ðŸ“
               </div>
 
               <h3 className="mt-4 text-lg font-semibold">

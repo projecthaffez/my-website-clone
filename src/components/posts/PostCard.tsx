@@ -1,15 +1,16 @@
+"use client";
+
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { useState } from "react";
+import {
+  deletePostAction,
+  togglePinPostAction,
+} from "@/actions/post";
+import { ReportButton } from "@/components/reports/ReportButton";
+import { CommentForm } from "./CommentForm";
 import { LikeButton } from "./LikeButton";
 import { SaveButton } from "./SaveButton";
 import { ShareButton } from "./ShareButton";
-import { CommentForm } from "./CommentForm";
-import { DeleteCommentButton } from "./DeleteCommentButton";
-import { ReplyButton } from "./ReplyButton";
-import { PostManagement } from "./PostManagement";
-import { PagePostManagement } from "@/components/pages/PagePostManagement";
-import { ReportButton } from "@/components/reports/ReportButton";
 
 interface PostCardProps {
   post: {
@@ -17,178 +18,115 @@ interface PostCardProps {
     content: string;
     createdAt: Date;
 
+    media: {
+      id: string;
+      url: string;
+      type: "IMAGE" | "VIDEO" | "DOCUMENT";
+      aspectRatio: number | null;
+    }[];
+
     author: {
       username: string;
       name: string;
       avatarUrl: string | null;
       isVerified: boolean;
     };
+
+    isLiked?: boolean;
+    isSaved?: boolean;
+    isPinned?: boolean;
+    reactionCount?: number;
+    commentCount?: number;
+    shareCount?: number;
   };
 }
 
-export async function PostCard({
+function formatPostDate(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(date));
+}
+
+function getInitial(name: string) {
+  return name.charAt(0).toUpperCase();
+}
+
+export function PostCard({
   post,
 }: PostCardProps) {
-  const currentUser =
-    await getCurrentUser();
+  const [deleted, setDeleted] = useState(false);
 
-  const [
-    likeCount,
-    currentUserReaction,
-    savedPost,
-    comments,
-    postMeta,
-  ] = await Promise.all([
-    db.reaction.count({
-      where: {
-        postId: post.id,
-        type: "LIKE",
-      },
-    }),
+  const [pinned, setPinned] = useState(
+    Boolean(post.isPinned),
+  );
 
-    currentUser
-      ? db.reaction.findUnique({
-          where: {
-            userId_postId: {
-              userId: currentUser.id,
-              postId: post.id,
-            },
-          },
-          select: {
-            type: true,
-          },
-        })
-      : null,
+  const [deleting, setDeleting] = useState(false);
+  const [pinning, setPinning] = useState(false);
 
-    currentUser
-      ? db.savedPost.findUnique({
-          where: {
-            userId_postId: {
-              userId: currentUser.id,
-              postId: post.id,
-            },
-          },
-          select: {
-            userId: true,
-          },
-        })
-      : null,
+  const [deleteError, setDeleteError] = useState("");
+  const [pinError, setPinError] = useState("");
 
-    db.comment.findMany({
-      where: {
-        postId: post.id,
-        isDeleted: false,
-        parentId: null,
-      },
+  async function handleDelete() {
+    if (deleting) {
+      return;
+    }
 
-      orderBy: {
-        createdAt: "desc",
-      },
-
-      take: 5,
-
-      select: {
-        id: true,
-        content: true,
-        createdAt: true,
-
-        author: {
-          select: {
-            id: true,
-            username: true,
-            name: true,
-            avatarUrl: true,
-            isVerified: true,
-          },
-        },
-
-        replies: {
-          where: {
-            isDeleted: false,
-          },
-
-          orderBy: {
-            createdAt: "asc",
-          },
-
-          take: 5,
-
-          select: {
-            id: true,
-            content: true,
-            createdAt: true,
-
-            author: {
-              select: {
-                id: true,
-                username: true,
-                name: true,
-                avatarUrl: true,
-                isVerified: true,
-              },
-            },
-          },
-        },
-      },
-    }),
-
-    db.post.findUnique({
-      where: {
-        id: post.id,
-      },
-
-      select: {
-        isPinned: true,
-        pageId: true,
-
-        page: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            ownerId: true,
-          },
-        },
-      },
-    }),
-  ]);
-
-  const commentCount =
-    await db.comment.count({
-      where: {
-        postId: post.id,
-        isDeleted: false,
-      },
-    });
-
-  const formattedDate =
-    new Intl.DateTimeFormat(
-      "en-US",
-      {
-        dateStyle: "medium",
-        timeStyle: "short",
-      },
-    ).format(post.createdAt);
-
-  const isPostOwner =
-    currentUser?.username ===
-    post.author.username;
-
-  const isPagePost =
-    Boolean(postMeta?.pageId);
-
-  const isPageOwner =
-    Boolean(
-      currentUser &&
-        postMeta?.page &&
-        postMeta.page.ownerId ===
-          currentUser.id,
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this post?",
     );
 
+    if (!confirmed) {
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError("");
+
+    const result = await deletePostAction(post.id);
+
+    if (!result.success) {
+      setDeleteError(result.error);
+      setDeleting(false);
+      return;
+    }
+
+    setDeleted(true);
+    setDeleting(false);
+  }
+
+  async function handlePin() {
+    if (pinning) {
+      return;
+    }
+
+    setPinning(true);
+    setPinError("");
+
+    const result = await togglePinPostAction(post.id);
+
+    if (!result.success) {
+      setPinError(result.error);
+      setPinning(false);
+      return;
+    }
+
+    setPinned(result.pinned);
+    setPinning(false);
+  }
+
+  if (deleted) {
+    return null;
+  }
+
   return (
-    <article className="rounded-2xl border border-white/10 bg-slate-900 p-5">
-      {/* Author */}
-      <div className="flex gap-3">
+    <article className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
+      {/* Header */}
+      <div className="flex items-start gap-3 px-5 py-4">
+        {/* Avatar */}
         <Link
           href={`/profile/${post.author.username}`}
           className="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-slate-800"
@@ -201,423 +139,219 @@ export async function PostCard({
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center font-bold text-slate-400">
-              {post.author.name
-                .charAt(0)
-                .toUpperCase()}
+              {getInitial(post.author.name)}
             </div>
           )}
         </Link>
 
+        {/* Author */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/profile/${post.author.username}`}
-              className="font-semibold hover:text-blue-400"
+              className="font-semibold text-slate-100 hover:text-blue-400"
             >
               {post.author.name}
             </Link>
 
             {post.author.isVerified && (
-              <span className="text-xs text-blue-400">
+              <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
                 ✓
               </span>
             )}
 
-            {isPagePost &&
-              postMeta?.page && (
-                <Link
-                  href={`/pages/${postMeta.page.slug}`}
-                  className="rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-400 hover:bg-blue-500/15"
-                >
-                  {postMeta.page.name}
-                </Link>
-              )}
-
-            {postMeta?.isPinned && (
-              <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-xs text-blue-400">
-                📌 Pinned
+            {pinned && (
+              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
+                Pinned
               </span>
             )}
           </div>
 
-          <div className="flex gap-2 text-xs text-slate-500">
-            <span>
-              @{post.author.username}
-            </span>
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <span>@{post.author.username}</span>
 
             <span>•</span>
 
-            <span>{formattedDate}</span>
+            <time
+              dateTime={new Date(
+                post.createdAt,
+              ).toISOString()}
+            >
+              {formatPostDate(post.createdAt)}
+            </time>
           </div>
+        </div>
+
+        {/* Post Menu */}
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={handlePin}
+            disabled={pinning}
+            title={
+              pinned ? "Unpin post" : "Pin post"
+            }
+            className="rounded-lg px-2 py-1.5 text-xs text-slate-500 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
+          >
+            {pinning
+              ? "..."
+              : pinned
+                ? "Unpin"
+                : "Pin"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            title="Delete post"
+            className="rounded-lg px-2 py-1.5 text-xs text-slate-500 transition hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+          >
+            {deleting ? "..." : "Delete"}
+          </button>
         </div>
       </div>
 
-      {/* Post Management */}
-      {isPagePost ? (
-        isPageOwner && (
-          <PagePostManagement
-            postId={post.id}
-          />
-        )
-      ) : (
-        isPostOwner && (
-          <PostManagement
-            postId={post.id}
-            initialPinned={
-              postMeta?.isPinned ?? false
-            }
-          />
-        )
+      {deleteError && (
+        <div className="mx-5 mb-3 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          {deleteError}
+        </div>
       )}
 
-      {/* Post Content */}
-      <div className="mt-5 whitespace-pre-wrap break-words text-sm leading-7 text-slate-200">
-        {post.content}
-      </div>
+      {pinError && (
+        <div className="mx-5 mb-3 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          {pinError}
+        </div>
+      )}
 
-      {/* Post Actions */}
-      <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
-        {/* Like */}
-        {currentUser ? (
+      {/* Content */}
+      {post.content && (
+        <div className="px-5 pb-2">
+          <p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-200">
+            {post.content}
+          </p>
+        </div>
+      )}
+
+      {/* Media */}
+      {post.media.length > 0 && (
+        <div
+          className={`mt-4 grid gap-2 px-5 ${
+            post.media.length === 1
+              ? "grid-cols-1"
+              : "grid-cols-2"
+          }`}
+        >
+          {post.media.map((media) => {
+            if (media.type === "IMAGE") {
+              return (
+                <div
+                  key={media.id}
+                  className="group overflow-hidden rounded-2xl border border-white/10 bg-slate-950"
+                >
+                  <a
+                    href={media.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                  >
+                    <img
+                      src={media.url}
+                      alt="Post media"
+                      loading="lazy"
+                      className="max-h-[650px] w-full object-cover transition duration-300 group-hover:scale-[1.01]"
+                      style={
+                        media.aspectRatio
+                          ? {
+                              aspectRatio:
+                                media.aspectRatio,
+                            }
+                          : undefined
+                      }
+                    />
+                  </a>
+                </div>
+              );
+            }
+
+            if (media.type === "VIDEO") {
+              return (
+                <div
+                  key={media.id}
+                  className="overflow-hidden rounded-2xl border border-white/10 bg-black"
+                >
+                  <video
+                    src={media.url}
+                    controls
+                    preload="metadata"
+                    playsInline
+                    className="max-h-[650px] w-full"
+                    style={
+                      media.aspectRatio
+                        ? {
+                            aspectRatio:
+                              media.aspectRatio,
+                          }
+                        : undefined
+                    }
+                  />
+                </div>
+              );
+            }
+
+            return (
+              <a
+                key={media.id}
+                href={media.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex min-h-28 items-center gap-4 rounded-2xl border border-white/10 bg-slate-950 p-5 transition hover:border-white/20 hover:bg-white/5"
+              >
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-2xl">
+                  📄
+                </div>
+
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-200">
+                    Document
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    Click to open document
+                  </p>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="mt-4 border-t border-white/10 px-5 py-3">
+        <div className="flex flex-wrap items-center gap-2">
           <LikeButton
             postId={post.id}
-            initialLiked={
-              currentUserReaction?.type ===
-              "LIKE"
-            }
-            initialCount={likeCount}
+            initialLiked={Boolean(post.isLiked)}
+            initialCount={post.reactionCount ?? 0}
           />
-        ) : (
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
-          >
-            ♡ {likeCount}{" "}
-            {likeCount === 1
-              ? "Like"
-              : "Likes"}
-          </Link>
-        )}
 
-        {/* Save */}
-        {currentUser ? (
           <SaveButton
             postId={post.id}
-            initialSaved={Boolean(
-              savedPost,
-            )}
+            initialSaved={Boolean(post.isSaved)}
           />
-        ) : (
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
-          >
-            🔖 Save
-          </Link>
-        )}
 
-        {/* Share */}
-        <ShareButton postId={post.id} />
+          <ShareButton postId={post.id} />
 
-        {/* Report Post */}
-        {currentUser &&
-          !isPostOwner && (
-            <ReportButton
-              targetType="POST"
-              targetId={post.id}
-            />
-          )}
+          <ReportButton
+            targetType="POST"
+            targetId={post.id}
+          />
+        </div>
       </div>
 
       {/* Comments */}
-      <div className="mt-4 border-t border-white/10 pt-4">
-        <div className="mb-3 text-sm font-semibold text-slate-300">
-          {commentCount}{" "}
-          {commentCount === 1
-            ? "Comment"
-            : "Comments"}
-        </div>
-
-        {comments.length > 0 && (
-          <div className="space-y-3">
-            {comments.map((comment) => {
-              const commentDate =
-                new Intl.DateTimeFormat(
-                  "en-US",
-                  {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  },
-                ).format(
-                  comment.createdAt,
-                );
-
-              return (
-                <div
-                  key={comment.id}
-                  className="rounded-xl bg-slate-950/70 p-3"
-                >
-                  <div className="flex gap-3">
-                    <Link
-                      href={`/profile/${comment.author.username}`}
-                      className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-slate-800"
-                    >
-                      {comment.author
-                        .avatarUrl ? (
-                        <img
-                          src={
-                            comment.author
-                              .avatarUrl
-                          }
-                          alt={
-                            comment.author
-                              .name
-                          }
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-sm font-bold text-slate-400">
-                          {comment.author
-                            .name
-                            .charAt(0)
-                            .toUpperCase()}
-                        </div>
-                      )}
-                    </Link>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          href={`/profile/${comment.author.username}`}
-                          className="text-sm font-semibold hover:text-blue-400"
-                        >
-                          {
-                            comment
-                              .author
-                              .name
-                          }
-                        </Link>
-
-                        {comment.author
-                          .isVerified && (
-                          <span className="text-xs text-blue-400">
-                            ✓
-                          </span>
-                        )}
-
-                        <span className="text-xs text-slate-600">
-                          @
-                          {
-                            comment
-                              .author
-                              .username
-                          }
-                        </span>
-                      </div>
-
-                      <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-300">
-                        {comment.content}
-                      </p>
-
-                      <p className="mt-1 text-xs text-slate-600">
-                        {commentDate}
-                      </p>
-
-                      <div className="mt-2 flex flex-wrap items-center gap-3">
-                        {currentUser && (
-                          <ReplyButton
-                            postId={post.id}
-                            commentId={
-                              comment.id
-                            }
-                          />
-                        )}
-
-                        {currentUser?.id ===
-                          comment.author
-                            .id && (
-                          <DeleteCommentButton
-                            commentId={
-                              comment.id
-                            }
-                          />
-                        )}
-
-                        {currentUser &&
-                          currentUser.id !==
-                            comment.author
-                              .id && (
-                          <ReportButton
-                            targetType="COMMENT"
-                            targetId={
-                              comment.id
-                            }
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Replies */}
-                  {comment.replies
-                    .length > 0 && (
-                    <div className="ml-12 mt-3 space-y-3 border-l border-white/10 pl-4">
-                      {comment.replies.map(
-                        (reply) => {
-                          const replyDate =
-                            new Intl.DateTimeFormat(
-                              "en-US",
-                              {
-                                dateStyle:
-                                  "medium",
-                                timeStyle:
-                                  "short",
-                              },
-                            ).format(
-                              reply.createdAt,
-                            );
-
-                          return (
-                            <div
-                              key={
-                                reply.id
-                              }
-                              className="flex gap-3"
-                            >
-                              <Link
-                                href={`/profile/${reply.author.username}`}
-                                className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-slate-800"
-                              >
-                                {reply
-                                  .author
-                                  .avatarUrl ? (
-                                  <img
-                                    src={
-                                      reply
-                                        .author
-                                        .avatarUrl
-                                    }
-                                    alt={
-                                      reply
-                                        .author
-                                        .name
-                                    }
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center text-xs font-bold text-slate-400">
-                                    {reply
-                                      .author
-                                      .name
-                                      .charAt(
-                                        0,
-                                      )
-                                      .toUpperCase()}
-                                  </div>
-                                )}
-                              </Link>
-
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <Link
-                                    href={`/profile/${reply.author.username}`}
-                                    className="text-sm font-semibold hover:text-blue-400"
-                                  >
-                                    {
-                                      reply
-                                        .author
-                                        .name
-                                    }
-                                  </Link>
-
-                                  {reply
-                                    .author
-                                    .isVerified && (
-                                    <span className="text-xs text-blue-400">
-                                      ✓
-                                    </span>
-                                  )}
-
-                                  <span className="text-xs text-slate-600">
-                                    @
-                                    {
-                                      reply
-                                        .author
-                                        .username
-                                    }
-                                  </span>
-                                </div>
-
-                                <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-300">
-                                  {
-                                    reply
-                                      .content
-                                  }
-                                </p>
-
-                                <p className="mt-1 text-xs text-slate-600">
-                                  {
-                                    replyDate
-                                  }
-                                </p>
-
-                                <div className="mt-2 flex flex-wrap items-center gap-3">
-                                  {currentUser?.id ===
-                                    reply
-                                      .author
-                                      .id && (
-                                    <DeleteCommentButton
-                                      commentId={
-                                        reply.id
-                                      }
-                                    />
-                                  )}
-
-                                  {currentUser &&
-                                    currentUser.id !==
-                                      reply
-                                        .author
-                                        .id && (
-                                      <ReportButton
-                                        targetType="COMMENT"
-                                        targetId={
-                                          reply.id
-                                        }
-                                      />
-                                    )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        },
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {commentCount > 5 && (
-          <p className="mt-3 text-xs text-slate-500">
-            Showing the latest 5 comments.
-          </p>
-        )}
-
-        {/* New Comment */}
-        {currentUser ? (
-          <CommentForm
-            postId={post.id}
-          />
-        ) : (
-          <Link
-            href="/login"
-            className="mt-4 block rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-center text-sm text-slate-400 hover:bg-white/5 hover:text-white"
-          >
-            Log in to comment
-          </Link>
-        )}
+      <div className="border-t border-white/10 px-5 py-4">
+        <CommentForm postId={post.id} />
       </div>
     </article>
   );

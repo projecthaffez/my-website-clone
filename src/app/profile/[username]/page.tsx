@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -200,7 +200,7 @@ export default async function ProfilePage({
         <div className="mx-auto max-w-2xl">
           <div className="rounded-2xl border border-white/10 bg-slate-900 p-8 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/5 text-2xl">
-              🔒
+              ðŸ”’
             </div>
 
             <h1 className="mt-5 text-2xl font-bold">
@@ -305,6 +305,18 @@ export default async function ProfilePage({
         id: true,
         content: true,
         createdAt: true,
+
+          media: {
+            select: {
+              id: true,
+              url: true,
+              type: true,
+              aspectRatio: true,
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
 
         author: {
           select: {
@@ -462,7 +474,7 @@ export default async function ProfilePage({
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-400">
               {profile.location && (
                 <span>
-                  📍 {profile.location}
+                  ðŸ“ {profile.location}
                 </span>
               )}
 
@@ -473,7 +485,7 @@ export default async function ProfilePage({
                   rel="noopener noreferrer"
                   className="text-blue-400 hover:underline"
                 >
-                  🔗 Website
+                  ðŸ”— Website
                 </a>
               )}
 
@@ -573,7 +585,7 @@ export default async function ProfilePage({
           0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-900 p-10 text-center">
               <div className="text-4xl">
-                📝
+                ðŸ“
               </div>
 
               <h3 className="mt-4 text-lg font-semibold">
