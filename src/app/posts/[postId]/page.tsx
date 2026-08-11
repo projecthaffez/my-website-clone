@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { PostCard } from "@/components/posts/PostCard";
+import { CommentForm } from "@/components/posts/CommentForm";
+import { ReplyButton } from "@/components/posts/ReplyButton";
 
 interface PostDetailPageProps {
   params: Promise<{
@@ -71,6 +73,53 @@ export default async function PostDetailPage({
         },
       },
 
+      comments: {
+        where: {
+          parentId: null,
+          isDeleted: false,
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+        select: {
+          id: true,
+          content: true,
+          createdAt: true,
+
+          author: {
+            select: {
+              username: true,
+              name: true,
+              avatarUrl: true,
+              isVerified: true,
+            },
+          },
+
+          replies: {
+            where: {
+              isDeleted: false,
+            },
+            orderBy: {
+              createdAt: "asc",
+            },
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+
+              author: {
+                select: {
+                  username: true,
+                  name: true,
+                  avatarUrl: true,
+                  isVerified: true,
+                },
+              },
+            },
+          },
+        },
+      },
+
       _count: {
         select: {
           reactions: true,
@@ -82,6 +131,20 @@ export default async function PostDetailPage({
 
   if (!post || post.isDeleted) {
     notFound();
+  }
+
+  function formatCommentDate(date: Date) {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(date));
+  }
+
+  function getInitial(name: string) {
+    return name.charAt(0).toUpperCase();
   }
 
   return (
@@ -96,9 +159,7 @@ export default async function PostDetailPage({
           </Link>
 
           <div>
-            <h1 className="font-semibold">
-              Post
-            </h1>
+            <h1 className="font-semibold">Post</h1>
 
             <p className="text-xs text-slate-500">
               Post by {post.author.name}
@@ -116,16 +177,180 @@ export default async function PostDetailPage({
             media: post.media,
             author: post.author,
             isPinned: post.isPinned,
-            isLiked:
-              post.reactions.length > 0,
-            isSaved:
-              post.savedBy.length > 0,
-            reactionCount:
-              post._count.reactions,
-            commentCount:
-              post._count.comments,
+            isLiked: post.reactions.length > 0,
+            isSaved: post.savedBy.length > 0,
+            reactionCount: post._count.reactions,
+            commentCount: post._count.comments,
           }}
         />
+
+        <section className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
+          <div className="border-b border-white/10 px-5 py-4">
+            <h2 className="text-base font-semibold text-white">
+              Comments
+            </h2>
+
+            <p className="mt-1 text-xs text-slate-500">
+              {post._count.comments}{" "}
+              {post._count.comments === 1
+                ? "comment"
+                : "comments"}
+            </p>
+          </div>
+
+          <div className="px-5">
+            <CommentForm postId={post.id} />
+          </div>
+
+          <div className="border-t border-white/10">
+            {post.comments.length === 0 ? (
+              <div className="px-5 py-10 text-center">
+                <p className="text-sm font-medium text-slate-300">
+                  No comments yet
+                </p>
+
+                <p className="mt-1 text-xs text-slate-600">
+                  Be the first to comment on this post.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-white/5">
+                {post.comments.map((comment) => (
+                  <div
+                    key={comment.id}
+                    className="px-5 py-5"
+                  >
+                    <div className="flex gap-3">
+                      <Link
+                        href={`/profile/${comment.author.username}`}
+                        className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-slate-800"
+                      >
+                        {comment.author.avatarUrl ? (
+                          <img
+                            src={comment.author.avatarUrl}
+                            alt={comment.author.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xs font-bold text-slate-400">
+                            {getInitial(comment.author.name)}
+                          </div>
+                        )}
+                      </Link>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="rounded-2xl bg-slate-950 px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              href={`/profile/${comment.author.username}`}
+                              className="text-sm font-semibold text-slate-200 hover:text-blue-400"
+                            >
+                              {comment.author.name}
+                            </Link>
+
+                            {comment.author.isVerified && (
+                              <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                                ✓
+                              </span>
+                            )}
+
+                            <span className="text-[11px] text-slate-600">
+                              @{comment.author.username}
+                            </span>
+                          </div>
+
+                          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
+                            {comment.content}
+                          </p>
+                        </div>
+
+                        <div className="mt-2 flex items-center gap-3 px-2">
+                          <time className="text-[11px] text-slate-600">
+                            {formatCommentDate(
+                              comment.createdAt,
+                            )}
+                          </time>
+
+                          <ReplyButton
+                            postId={post.id}
+                            commentId={comment.id}
+                          />
+                        </div>
+
+                        {comment.replies.length > 0 && (
+                          <div className="mt-4 ml-5 space-y-3 border-l border-white/10 pl-4">
+                            {comment.replies.map((reply) => (
+                              <div
+                                key={reply.id}
+                                className="flex gap-3"
+                              >
+                                <Link
+                                  href={`/profile/${reply.author.username}`}
+                                  className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-slate-800"
+                                >
+                                  {reply.author.avatarUrl ? (
+                                    <img
+                                      src={
+                                        reply.author.avatarUrl
+                                      }
+                                      alt={
+                                        reply.author.name
+                                      }
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-slate-400">
+                                      {getInitial(
+                                        reply.author.name,
+                                      )}
+                                    </div>
+                                  )}
+                                </Link>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="rounded-2xl bg-slate-950 px-4 py-3">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Link
+                                        href={`/profile/${reply.author.username}`}
+                                        className="text-sm font-semibold text-slate-200 hover:text-blue-400"
+                                      >
+                                        {reply.author.name}
+                                      </Link>
+
+                                      {reply.author.isVerified && (
+                                        <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                                          ✓
+                                        </span>
+                                      )}
+
+                                      <span className="text-[11px] text-slate-600">
+                                        @{reply.author.username}
+                                      </span>
+                                    </div>
+
+                                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">
+                                      {reply.content}
+                                    </p>
+                                  </div>
+
+                                  <time className="mt-2 block px-2 text-[11px] text-slate-600">
+                                    {formatCommentDate(
+                                      reply.createdAt,
+                                    )}
+                                  </time>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </main>
   );
