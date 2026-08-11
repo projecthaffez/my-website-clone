@@ -172,13 +172,20 @@ export function PostCard({
 
             <span>•</span>
 
-            <time
-              dateTime={new Date(
-                post.createdAt,
-              ).toISOString()}
+            {/* Post Detail Link */}
+            <Link
+              href={`/posts/${post.id}`}
+              className="text-slate-500 transition hover:text-blue-400"
+              title="Open post"
             >
-              {formatPostDate(post.createdAt)}
-            </time>
+              <time
+                dateTime={new Date(
+                  post.createdAt,
+                ).toISOString()}
+              >
+                {formatPostDate(post.createdAt)}
+              </time>
+            </Link>
           </div>
         </div>
 
@@ -189,7 +196,9 @@ export function PostCard({
             onClick={handlePin}
             disabled={pinning}
             title={
-              pinned ? "Unpin post" : "Pin post"
+              pinned
+                ? "Unpin post"
+                : "Pin post"
             }
             className="rounded-lg px-2 py-1.5 text-xs text-slate-500 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
           >
@@ -332,7 +341,9 @@ export function PostCard({
           <LikeButton
             postId={post.id}
             initialLiked={Boolean(post.isLiked)}
-            initialCount={post.reactionCount ?? 0}
+            initialCount={
+              post.reactionCount ?? 0
+            }
           />
 
           <SaveButton
