@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { ChatForm } from "./ChatForm";
 import { MarkAsRead } from "./MarkAsRead";
+import { DeleteMessageButton } from "./DeleteMessageButton";
 
 interface ConversationPageProps {
   params: Promise<{
@@ -186,38 +187,52 @@ export default async function ConversationPage({
               return (
                 <div
                   key={message.id}
-                  className={`flex ${
+                  className={`group flex ${
                     isMine
                       ? "justify-end"
                       : "justify-start"
                   }`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                    className={`flex max-w-[80%] items-end gap-2 ${
                       isMine
-                        ? "rounded-br-md bg-blue-600 text-white"
-                        : "rounded-bl-md bg-slate-800 text-slate-200"
+                        ? "flex-row-reverse"
+                        : "flex-row"
                     }`}
                   >
-                    <p className="whitespace-pre-wrap break-words text-sm">
-                      {message.content}
-                    </p>
-
-                    <p
-                      className={`mt-1 text-[10px] ${
+                    <div
+                      className={`relative rounded-2xl px-4 py-3 ${
                         isMine
-                          ? "text-blue-200"
-                          : "text-slate-500"
+                          ? "rounded-br-md bg-blue-600 text-white"
+                          : "rounded-bl-md bg-slate-800 text-slate-200"
                       }`}
                     >
-                      {new Intl.DateTimeFormat(
-                        "en-US",
-                        {
-                          hour: "numeric",
-                          minute: "2-digit",
-                        },
-                      ).format(message.createdAt)}
-                    </p>
+                      <p className="whitespace-pre-wrap break-words text-sm">
+                        {message.content}
+                      </p>
+
+                      <p
+                        className={`mt-1 text-[10px] ${
+                          isMine
+                            ? "text-blue-200"
+                            : "text-slate-500"
+                        }`}
+                      >
+                        {new Intl.DateTimeFormat(
+                          "en-US",
+                          {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          },
+                        ).format(message.createdAt)}
+                      </p>
+                    </div>
+
+                    {isMine && (
+                      <DeleteMessageButton
+                        messageId={message.id}
+                      />
+                    )}
                   </div>
                 </div>
               );
